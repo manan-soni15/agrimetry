@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@turf/area": "^7.4.0",
+    "geotiff": "^3.0.5",
     "maplibre-gl": "^6.18.0",
     "next": "16.4.6",
     "pmtiles": "^4.5.0",
+    "pngjs": "^7.0.0",
+    "proj4": "^2.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "terra-draw": "^1.39.0",
@@ -24,5 +27,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }

@@ -225,3 +225,8 @@
 @media (prefers-reduced-motion: reduce) {
   .agm-shell *, .agm-shell *::before, .agm-shell *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+
+.agm-available-layer { color: #436b43; text-decoration: none; padding: 7px 8px; border: 1px solid rgba(92,132,82,.22); border-radius: 7px; background: rgba(235,243,229,.72); transition: background .18s ease, border-color .18s ease; }
+.agm-available-layer:hover { color: #244f38; border-color: rgba(72,115,66,.42); background: #e7efe0; }
+.agm-available-layer em { color: #426c40; }

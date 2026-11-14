@@ -13,7 +13,6 @@ const PRIORITY_OPTIONS = [
 const NEXT_LAYERS = [
   { code: 'SMAP', title: 'Soil moisture', detail: 'Surface and root-zone moisture', status: 'Next integration', icon: 'droplet' },
   { code: 'GPM', title: 'Precipitation', detail: 'Satellite rainfall estimates', status: 'Next integration', icon: 'rain' },
-  { code: 'Landsat', title: 'Vegetation', detail: 'NDVI and seasonal field patterns', status: 'Next integration', icon: 'leaf' },
 ];
 
 function Icon({ name, size = 18, strokeWidth = 1.7 }) {
@@ -238,6 +237,7 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
         <div className="fx-source-card">
           <div className="fx-source-card-head"><span className="fx-overline">DATA LAYERS</span><span className="fx-live-pill"><i /> READY TO CONNECT</span></div>
           <div className="fx-layer-row fx-layer-active"><span className="fx-layer-icon"><Icon name="sun" /></span><span><strong>NASA POWER</strong><small>Daily temperature, rainfall, humidity, solar</small></span><span className="fx-layer-status">LIVE</span></div>
+          <Link href="/explore/vegetation" className="fx-layer-row fx-layer-active fx-layer-link"><span className="fx-layer-icon"><Icon name="leaf" /></span><span><strong>Sentinel-2 · Vegetation</strong><small>Field NDVI and seasonal observations</small></span><span className="fx-layer-status">LIVE</span></Link>
           {NEXT_LAYERS.map((layer) => <div className="fx-layer-row" key={layer.code}><span className="fx-layer-icon"><Icon name={layer.icon} /></span><span><strong>{layer.code} · {layer.title}</strong><small>{layer.detail}</small></span><span className="fx-layer-next">NEXT</span></div>)}
           <div className="fx-source-card-foot">NASA Earth observations + local farm context</div>
         </div>
@@ -451,6 +451,7 @@ export default function FarmExplorer() {
           <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}><Icon name="grid" size={17} /><span>Farm overview</span></button>
           <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
           <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
+          <Link href="/explore/vegetation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Field vegetation</span><em>LIVE</em></Link>
           <button onClick={() => handleNavClick('rotation')}><Icon name="sprout" size={17} /><span>Rotation explorer</span><em>SOON</em></button>
           <button onClick={() => handleNavClick('climate')}><Icon name="calendar" size={17} /><span>Climate replay</span><em>SOON</em></button>
         </nav>

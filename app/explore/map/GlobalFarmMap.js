@@ -745,7 +745,7 @@ export default function GlobalFarmMap() {
               <label className="agm-layer-toggle"><span><strong>Predicted field boundaries · FTW 2025</strong><small>Global model-derived outlines · approx. 10 m · confidence varies</small></span><input type="checkbox" checked={ftwLayerVisible} onChange={(event) => toggleFtwLayer(event.target.checked)}/></label>
               <span className="agm-layer-caption">EARTH OBSERVATION</span>
               <label className="agm-layer-toggle"><span><strong>NASA MODIS true colour</strong><small>Global imagery · approx. 250 m · max zoom 9</small></span><input type="checkbox" checked={nasaOverlay} onChange={(event) => setNasaOverlay(event.target.checked)}/></label>
-              <div className="agm-planned-layer"><span>NDVI · Sentinel-2 / Landsat</span><em>Next integration</em></div>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/vegetation"><span>Vegetation · Sentinel-2 NDVI</span><em>Analyze field ↗</em></Link>
               <div className="agm-planned-layer"><span>Soil moisture · SMAP</span><em>Next integration</em></div>
               <div className="agm-planned-layer"><span>Rainfall · GPM</span><em>Next integration</em></div>
               <div className="agm-planned-layer"><span>Terrain · SRTM</span><em>Next integration</em></div>

@@ -77,6 +77,12 @@
 .fx-nav button span { flex: 1; }
 .fx-nav button em { font-size: 8px; font-style: normal; letter-spacing: .11em; color: rgba(232,220,197,.46); }
 .fx-nav-live { width: 6px; height: 6px; border-radius: 50%; background: #a8c49a; box-shadow: 0 0 0 4px rgba(168,196,154,.12); }
+.fx-nav-map-link { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 0 12px; color: rgba(248,245,235,.69); background: rgba(168,185,154,.075); border: 1px solid rgba(168,185,154,.15); border-radius: 11px; text-decoration: none; font-size: 12px; transition: .2s ease; }
+.fx-nav-map-link:hover { color: #fff; background: rgba(168,185,154,.15); border-color: rgba(168,185,154,.28); }
+.fx-nav-map-link > svg { color: #a8b99a; }
+.fx-nav-map-link span { flex: 1; }
+.fx-nav-map-link em { color: #c6d4b9; font-size: 8px; font-style: normal; font-weight: 800; letter-spacing: .1em; }
+
 .fx-sidebar-bottom { margin-top: auto; position: relative; z-index: 1; }
 .fx-side-earth { min-height: 112px; margin: 0 0 16px; border: 1px solid rgba(248,245,235,.12); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: rgba(255,255,255,.035); }
 .fx-side-earth > span { color: rgba(248,245,235,.56); font-size: 8px; font-weight: 700; letter-spacing: .16em; }
@@ -316,10 +322,11 @@
 @media (max-width: 900px) {
   .fx-sidebar { width: 72px; min-width: 72px; padding: 24px 10px 18px; align-items: center; }
   .fx-brand { justify-content: center; }
-  .fx-brand-word,.fx-workspace-label,.fx-nav button span,.fx-nav button em,.fx-sidebar-bottom .fx-side-earth,.fx-back-home,.fx-sidebar-version { display: none; }
+  .fx-brand-word,.fx-workspace-label,.fx-nav button span,.fx-nav button em,.fx-nav-map-link span,.fx-nav-map-link em,.fx-sidebar-bottom .fx-side-earth,.fx-back-home,.fx-sidebar-version { display: none; }
   .fx-nav { width: 100%; margin-top: 47px; }
   .fx-nav button { justify-content: center; padding: 0; }
-  .fx-nav button svg { width: 19px; height: 19px; }
+  .fx-nav-map-link { justify-content: center; padding: 0; }
+  .fx-nav button svg,.fx-nav-map-link svg { width: 19px; height: 19px; }
   .fx-nav button.is-active { box-shadow: inset 0 -3px 0 var(--fx-sage); }
   .fx-nav-live { position: absolute; margin: -22px 0 0 23px; }
   .fx-sidebar-bottom { margin-top: auto; }
@@ -519,5 +526,28 @@
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+
+/* Small interaction polish: keep the existing Agrimetry look and feel. */
+.fx-nav-map-link,
+.fx-outline-button,
+.fx-source-card,
+.fx-metric,
+.fx-panel {
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+
+.fx-nav-map-link:focus-visible,
+.fx-outline-button:focus-visible {
+  outline: 2px solid rgba(168, 185, 154, .95);
+  outline-offset: 3px;
+}
+
+.fx-source-card:hover,
+.fx-metric:hover,
+.fx-panel:hover {
+  border-color: rgba(146, 116, 81, .28);
+  box-shadow: 0 12px 28px rgba(65, 52, 30, .045);
 }
 

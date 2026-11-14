@@ -450,6 +450,7 @@ export default function FarmExplorer() {
         <nav className="fx-nav" aria-label="Application navigation">
           <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}><Icon name="grid" size={17} /><span>Farm overview</span></button>
           <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
+          <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
           <button onClick={() => handleNavClick('rotation')}><Icon name="sprout" size={17} /><span>Rotation explorer</span><em>SOON</em></button>
           <button onClick={() => handleNavClick('climate')}><Icon name="calendar" size={17} /><span>Climate replay</span><em>SOON</em></button>
         </nav>
@@ -490,3 +491,4 @@ export default function FarmExplorer() {
     </main>
   );
 }
+

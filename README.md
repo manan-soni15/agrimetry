@@ -40,7 +40,7 @@ The current application combines NASA climate/visualization resources with openl
 
 ### Field Vegetation Intelligence — `/explore/vegetation`
 
-This release uses a **public STAC catalog and public Sentinel-2 Cloud-Optimized GeoTIFF (COG) assets**. It does not require Google Earth Engine, a Google Cloud project, a service account, a private API key or `.env.local` credentials for this feature.
+This release uses a **public STAC catalog and public Sentinel-2 Cloud-Optimized GeoTIFF (COG) assets**. 
 
 The farmer chooses a saved Polygon or MultiPolygon field from the Global Farm Map. Agrimetry sends that selected GeoJSON geometry (not just its centre coordinate) to the server-side vegetation API.
 

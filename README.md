@@ -327,6 +327,28 @@ Clearing site data removes them. Nothing is sent to a server except the field ge
 
 ---
 
+## Story-first experience and interface refinements
+
+Agrimetry presents each analysis as a story about a specific field rather than a list of disconnected measurements. The intended reading flow is:
+
+1. **The place:** identify the selected field and the observation period.
+2. **What the data saw:** show the satellite, climate or soil observation with its date, spatial resolution and source.
+3. **What changed:** compare the observation with an earlier period or a relevant baseline where data supports that comparison.
+4. **What it could mean:** explain plausible interpretations without presenting correlation as proof or guessing at causes.
+5. **What to look at next:** give a practical field check or a question to discuss with a local agronomist.
+6. **How certain is this:** state missing observations, cloud coverage, model uncertainty, scale mismatch and other limitations beside the interpretation.
+
+The soil-health page now includes a plain-language field story that connects texture, organic carbon, pH and flagged limitations. It distinguishes farmer-entered test results from SoilGrids estimates and avoids treating a modelled profile as a laboratory diagnosis.
+
+The shared analytical-page styles have also been refined:
+- Compact, consistent form controls and dropdowns, with bounded widths so long options do not stretch cards.
+- More predictable vertical and horizontal scrolling, including thin scrollbars and contained table scrolling.
+- Better keyboard focus visibility, responsive spacing and reduced-motion support.
+- More readable narrative paragraphs and consistent story-panel spacing.
+- The map workspace keeps its map canvas fixed while side panels scroll independently.
+
+These are presentation improvements only; they do not change the underlying scientific calculations or data sources.
+
 ## 9. Limitations and responsible use
 
 - **NDVI** shows greenness, not yield, crop type, disease, soil fertility or soil moisture. Low NDVI can mean bare soil, fallow, water, buildings, a harvested or newly sown crop, or stress.

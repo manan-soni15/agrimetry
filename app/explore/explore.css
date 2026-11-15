@@ -551,3 +551,40 @@
   box-shadow: 0 12px 28px rgba(65, 52, 30, .045);
 }
 
+
+
+/* Agrimetry UI refinement: compact controls, predictable scroll and clearer focus. */
+.fx-app-shell { min-height: 100dvh; }
+.fx-sidebar { max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(232,220,197,.35) transparent; }
+.fx-main-area, .fx-content, .fx-content-wrap { min-width: 0; }
+.fx-content { overscroll-behavior-y: contain; scroll-behavior: auto; }
+.fx-content-wrap { min-width: 0; }
+.fx-app-shell :is(input, select, textarea, button) { font-family: inherit; }
+.fx-app-shell select,
+.fx-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.fx-app-shell textarea {
+  max-width: 100%; min-width: 0; min-height: 36px; padding: 7px 10px;
+  border: 1px solid #d9dfd0; border-radius: 8px; background-color: #fffefa;
+  color: #304a35; font-size: 12px; line-height: 1.35;
+}
+.fx-app-shell select { width: 100%; text-overflow: ellipsis; cursor: pointer; }
+.fx-app-shell select option { padding: 7px 9px; font-size: 12px; }
+.fx-app-shell :is(input,select,textarea):focus-visible,
+.fx-app-shell button:focus-visible,
+.fx-app-shell a:focus-visible { outline: 3px solid rgba(100,132,87,.28); outline-offset: 2px; }
+.fx-app-shell button { transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.fx-app-shell button:active { transform: translateY(1px); }
+.fx-app-shell :is(.fx-form-grid,.fx-setup-layout,.fx-content-wrap) > * { min-width: 0; }
+.fx-app-shell :is(.fx-form-card,.fx-panel,.fx-card) { min-width: 0; }
+.fx-app-shell :is(.fx-form-card,.fx-panel,.fx-card) p { line-height: 1.65; }
+.fx-app-shell ::-webkit-scrollbar { width: 9px; height: 9px; }
+.fx-app-shell ::-webkit-scrollbar-track { background: transparent; }
+.fx-app-shell ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c9c2af; background-clip: padding-box; }
+.fx-app-shell ::-webkit-scrollbar-thumb:hover { background: #a9aa91; background-clip: padding-box; }
+@media (max-width: 900px) {
+  .fx-sidebar { max-height: none; }
+  .fx-content-wrap { padding-top: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-app-shell *, .fx-app-shell *::before, .fx-app-shell *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

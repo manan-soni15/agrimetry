@@ -258,6 +258,24 @@ export default function SoilHealthIntelligence() {
                     <article className="vi-metric-card"><span>BULK DENSITY</span><strong>{Number.isFinite(profile.effective.bdod) ? profile.effective.bdod.toFixed(2) : "—"}</strong><small>{profile.ratings.bulkDensity ? `${profile.ratings.bulkDensity.label} (kg/dm³). ${profile.origin.bdod === "farmer" ? "Your test." : "SoilGrids."}` : "No value available."}</small></article>
                   </div>
 
+                  <section className="vi-story-panel sh-land-story" aria-labelledby="sh-land-story-title">
+                    <div className="vi-story-intro">
+                      <span className="vi-story-leaf"><Icon name="leaf" size={21}/></span>
+                      <div>
+                        <span className="vi-overline">THE STORY BENEATH THIS FIELD</span>
+                        <h2 id="sh-land-story-title">What the soil is telling us</h2>
+                        <p>Every field has a foundation beneath the crop canopy. This profile brings together {hasFarmerValues ? "your soil-test results" : "mapped soil estimates"}{layers && hasFarmerValues ? " and regional SoilGrids information" : ""} to describe that foundation. It is a guide to what may shape crop choices, not a diagnosis of the whole field.</p>
+                      </div>
+                    </div>
+                    <div className="vi-story-grid">
+                      <article className="vi-story-cell"><span>THE SOIL'S TEXTURE</span><strong>{profile.texture || "Texture not yet known"}</strong><p>{Number.isFinite(sand) ? `The topsoil estimate is ${sand.toFixed(0)}% sand, ${silt.toFixed(0)}% silt and ${clay.toFixed(0)}% clay. Texture influences how quickly water drains, how much it can hold and how roots move through the soil.` : "Sand, silt and clay values are not available yet. Add a soil test to complete this part of the story."}</p></article>
+                      <article className="vi-story-cell"><span>THE SOIL'S ORGANIC FOUNDATION</span><strong>{profile.ratings.soc?.label || "No carbon result"}</strong><p>{profile.ratings.soc ? `${profile.ratings.soc.detail}. Organic carbon is one clue about the soil's organic matter; it does not by itself measure all aspects of soil fertility or biological activity.` : "Organic carbon was not available in this profile. A laboratory soil test can provide a more direct measurement."}</p></article>
+                      <article className="vi-story-cell"><span>THE CHEMICAL SETTING</span><strong>{Number.isFinite(profile.effective.phh2o) ? `pH ${profile.effective.phh2o.toFixed(1)}` : "pH not available"}</strong><p>{Number.isFinite(profile.effective.phh2o) ? "Soil pH influences nutrient availability and the suitability of different crops. The best range depends on the crop and local conditions." : "A pH result is needed before drawing conclusions about acidity or alkalinity."}</p></article>
+                      <article className="vi-story-cell"><span>WHAT MAY NEED ATTENTION</span><strong>{profile.limitations?.length ? `${profile.limitations.length} point${profile.limitations.length === 1 ? "" : "s"} to review` : "No flagged limitation"}</strong><p>{profile.limitations?.length ? "The evidence panel below explains each flagged property, why it may matter and what to consider when comparing rotations. These are prompts for investigation, not proof of a field problem." : "The available indicators have not flagged a major limitation. This does not rule out nutrient deficiencies, salinity or local variation that these datasets do not measure."}</p></article>
+                    </div>
+                    <div className="vi-story-next"><span className="vi-overline">A PRACTICAL NEXT STEP</span><p>Use this profile alongside a recent laboratory soil test and what you observe in the field. Compare texture, organic carbon and pH with the needs of the crops you are considering; investigate any flagged limitation with a local agronomist before changing the rotation.</p></div>
+                  </section>
+
                   <section className="vi-white-panel">
                     <div className="vi-panel-title"><div><span className="vi-overline">04 / POSSIBLE LIMITATIONS</span><h2>{profile.limitations.some((l) => l.severity !== "info") ? "What may hold the soil back" : "No major limitation flagged"}</h2><p>Plain-language reading of the values above, and what each means for crop choice and rotation planning.</p></div></div>
                     {profile.limitations.length ? (
@@ -307,3 +325,4 @@ export default function SoilHealthIntelligence() {
     </main>
   );
 }
+

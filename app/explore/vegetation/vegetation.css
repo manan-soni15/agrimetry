@@ -316,3 +316,64 @@
 .vi-zone-list span { color: #6f7a66; }
 .vi-class-grid { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; font-size: 11px; color: #5b6a52; }
 .vi-hotspot-stats small { display: block; font-size: 10px; color: #8a6a63; }
+
+
+/* Shared analytical workspace refinements. This stylesheet is imported by all insight pages. */
+.vi-page { min-height: 100dvh; }
+.vi-page :is(.vi-main,.vi-content,.vi-layout,.vi-results-area,.vi-workspace) { min-width: 0; }
+.vi-page :is(.vi-main,.vi-content,.vi-results-area) { overscroll-behavior-y: contain; }
+.vi-page :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
+  box-sizing: border-box; max-width: 100%; min-width: 0; min-height: 36px;
+  padding: 7px 10px; border: 1px solid #d8dfd1; border-radius: 8px;
+  color: #304a35; background: #fffefa; font: inherit; font-size: 12px; line-height: 1.35;
+}
+.vi-page select { width: 100%; text-overflow: ellipsis; cursor: pointer; }
+.vi-page select option { padding: 7px 9px; font-size: 12px; }
+.vi-page :is(button, a, input, select, textarea):focus-visible { outline: 3px solid rgba(93,128,79,.28); outline-offset: 2px; }
+.vi-page button { transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.vi-page button:active { transform: translateY(1px); }
+.vi-page :is(.vi-white-panel,.vi-story-panel,.vi-metric-card,.vi-analysis-progress) { min-width: 0; }
+.vi-page :is(.vi-white-panel,.vi-story-panel) { scroll-margin-top: 82px; }
+.vi-page .vi-white-panel p,
+.vi-page .vi-story-panel p { overflow-wrap: anywhere; }
+.vi-page .vi-observation-table,
+.vi-page .vi-table-scroll,
+.vi-page .rp-grid-wrap { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: #c8bea9 transparent; }
+.vi-page ::-webkit-scrollbar { width: 9px; height: 9px; }
+.vi-page ::-webkit-scrollbar-track { background: transparent; }
+.vi-page ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c9c2af; background-clip: padding-box; }
+.vi-page ::-webkit-scrollbar-thumb:hover { background: #a9aa91; background-clip: padding-box; }
+.vi-page .vi-story-panel { box-shadow: 0 10px 28px rgba(53,58,39,.055); }
+.vi-page .vi-story-intro p,
+.vi-page .vi-story-cell p,
+.vi-page .vi-story-next p { font-size: 11px; line-height: 1.75; }
+.vi-page .vi-story-cell > span { font-size: 8px; }
+.vi-page .vi-overline { line-height: 1.5; }
+.vi-page .vi-map-controls { flex-wrap: wrap; }
+.vi-page .vi-map-controls select { width: auto; min-width: 128px; max-width: min(220px, 100%); min-height: 32px; padding: 5px 28px 5px 9px; font-size: 11px; }
+.vi-page .ws-map-controls select,
+.vi-page .ws-map-controls input[type="date"] { min-height: 32px; max-width: 220px; padding: 5px 9px; font-size: 11px; }
+.vi-page .ro-slots select,
+.vi-page .ro-select { min-height: 34px; padding: 5px 8px; font-size: 11px; }
+.vi-page .sh-form input { min-height: 34px; padding: 6px 9px; font-size: 11px; }
+.vi-page .pp-controls select { min-height: 34px; }
+.vi-page .vi-analysis-progress { position: relative; }
+.vi-page .vi-progress-detail { font-size: 11px; line-height: 1.7; }
+.vi-page .vi-progress-step small { font-size: 9px; }
+.vi-page .vi-method-note { line-height: 1.65; }
+@media (max-width: 760px) {
+  .vi-page :is(.vi-header,.vi-topbar) { padding-inline: 14px; }
+  .vi-page :is(.vi-content-wrap,.vi-main-content) { padding-inline: 14px; }
+  .vi-page .vi-map-controls select { flex: 1 1 140px; max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vi-page *, .vi-page *::before, .vi-page *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+.vi-controls-panel { max-height: calc(100dvh - 104px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c8bea9 transparent; }
+.vi-controls-panel::-webkit-scrollbar { width: 7px; }
+.vi-controls-panel::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c9c2af; background-clip: padding-box; }
+.sh-land-story { margin-top: 2px; }
+@media (max-width: 900px) {
+  .vi-controls-panel { position: static; max-height: none; overflow: visible; }
+}

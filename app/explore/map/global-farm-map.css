@@ -230,3 +230,27 @@
 .agm-available-layer { color: #436b43; text-decoration: none; padding: 7px 8px; border: 1px solid rgba(92,132,82,.22); border-radius: 7px; background: rgba(235,243,229,.72); transition: background .18s ease, border-color .18s ease; }
 .agm-available-layer:hover { color: #244f38; border-color: rgba(72,115,66,.42); background: #e7efe0; }
 .agm-available-layer em { color: #426c40; }
+
+
+/* Map workspace scroll and control polish. Keep the map canvas fixed; scroll its side panels. */
+.agm-panel, .agm-field-list, .agm-drawer, .agm-modal-body {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c8bea9 transparent;
+}
+.agm-panel::-webkit-scrollbar, .agm-field-list::-webkit-scrollbar,
+.agm-drawer::-webkit-scrollbar, .agm-modal-body::-webkit-scrollbar { width: 8px; height: 8px; }
+.agm-panel::-webkit-scrollbar-thumb, .agm-field-list::-webkit-scrollbar-thumb,
+.agm-drawer::-webkit-scrollbar-thumb, .agm-modal-body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent; border-radius: 99px; background: #c9c2af; background-clip: padding-box;
+}
+.agm-shell :is(select,input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea) {
+  max-width: 100%; min-width: 0; font-family: inherit;
+}
+.agm-shell select { min-height: 34px; padding: 6px 28px 6px 9px; border-radius: 7px; font-size: 11px; }
+.agm-shell :is(button,a,input,select,textarea):focus-visible { outline: 3px solid rgba(93,128,79,.3); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .agm-workspace { grid-template-columns: minmax(0,1fr); overflow-y: auto; }
+  .agm-panel { max-height: min(52dvh, 520px); }
+}
+

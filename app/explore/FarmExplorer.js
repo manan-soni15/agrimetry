@@ -452,6 +452,7 @@ export default function FarmExplorer() {
           <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
           <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
           <Link href="/explore/vegetation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Field vegetation</span><em>LIVE</em></Link>
+          <Link href="/explore/land-story" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="book-open" size={17} /><span>AI Land Storyteller</span><em>AI</em></Link>
           <Link href="/explore/water-stress" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="droplet" size={17} /><span>Water stress</span><em>LIVE</em></Link>
           <Link href="/explore/bare-field" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Bare-field detection</span><em>LIVE</em></Link>
           <Link href="/explore/soil-health" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Soil health</span><em>LIVE</em></Link>

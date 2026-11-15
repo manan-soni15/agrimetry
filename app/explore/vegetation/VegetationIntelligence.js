@@ -613,6 +613,13 @@ export default function VegetationIntelligence() {
     try {
       const payload = await requestVegetation(selectedField, startDate, endDate);
       setResult(payload);
+      try {
+        localStorage.setItem("agrimetry:completed-vegetation-analysis:v1", JSON.stringify({
+          field: selectedField,
+          result: { summary: payload.summary, monthly: payload.monthly, phenology: payload.phenology || null, lowVegetation: payload.lowVegetation || null, fieldVariability: payload.fieldVariability || null },
+          startDate, endDate, completedAt: new Date().toISOString(),
+        }));
+      } catch (storageError) { console.warn("Could not save completed field analysis for Land Storyteller:", storageError); }
       // Previous-year comparison runs after the main report is shown, so a slow or
       // failed comparison never blocks the current analysis.
       if (compareSeasons) loadPreviousSeason(selectedField, startDate, endDate, runId);
@@ -626,6 +633,10 @@ export default function VegetationIntelligence() {
   function selectField(id) {
     const feature = fields.find((item, index) => fieldKey(item, index) === id);
     setSelectedFieldId(id);
+    try {
+      const cached = JSON.parse(localStorage.getItem("agrimetry:completed-vegetation-analysis:v1") || "null");
+      if (JSON.stringify(cached?.field?.geometry || null) !== JSON.stringify(feature?.geometry || null)) localStorage.removeItem("agrimetry:completed-vegetation-analysis:v1");
+    } catch {}
     runIdRef.current += 1;
     setResult(null);
     setPreviousResult(null);

@@ -1,0 +1,169 @@
+/* Sidebar interaction overrides: sidebar takes real layout space so the main
+   area resizes automatically. Collapsed = fully closed (0 width). */
+
+.agrimetry-explorer-shell {
+  --sb-w: 256px;
+  display: flex;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: clip;
+}
+
+.agrimetry-explorer-shell:has(.fx-sidebar-collapsed) {
+  --sb-w: 0px;
+}
+
+.agrimetry-explorer-main {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 0;
+}
+
+/* OPEN SIDEBAR (sticky = stays in layout flow, so main area shrinks/grows) */
+.agrimetry-explorer-shell > .fx-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  z-index: 40;
+  display: flex !important;
+  flex: 0 0 var(--sb-w);
+  width: var(--sb-w);
+  min-width: 0;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: width 220ms ease, flex-basis 220ms ease, padding 220ms ease;
+}
+
+/* COMPLETELY CLOSED SIDEBAR */
+.agrimetry-explorer-shell > .fx-sidebar.fx-sidebar-collapsed {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  visibility: hidden; /* hides all contents */
+}
+
+/* TOGGLE BUTTON: fixed, so it is never clipped and always visible */
+.agrimetry-explorer-shell .fx-sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: calc(var(--sb-w) - 17px);
+  transform: translateY(-50%);
+  z-index: 100;
+  visibility: visible; /* stays visible even when sidebar is hidden */
+
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+
+  border: 1px solid rgba(248,245,235,.65);
+  border-radius: 50%;
+  color: #f8f5eb;
+  background: #244f38;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,.25);
+  transition: left 220ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+/* when fully closed, sit just inside the left edge */
+.agrimetry-explorer-shell .fx-sidebar-collapsed .fx-sidebar-toggle {
+  left: 8px;
+}
+
+.agrimetry-explorer-shell .fx-sidebar-toggle:hover {
+  background: #356b4b;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+}
+
+.agrimetry-explorer-shell .fx-sidebar-toggle:focus-visible {
+  outline: 3px solid #d5e6b8;
+  outline-offset: 3px;
+}
+
+.agrimetry-explorer-shell .fx-sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 220ms ease;
+}
+
+.agrimetry-explorer-shell .fx-sidebar-collapsed .fx-sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+.fx-sidebar-mobile-trigger,
+.fx-sidebar-backdrop {
+  display: none;
+}
+
+/* MOBILE SIDEBAR (off-canvas drawer, overlays the page) */
+@media (max-width: 700px) {
+  .agrimetry-explorer-shell,
+  .agrimetry-explorer-shell:has(.fx-sidebar-collapsed) {
+    --sb-w: 0px;
+  }
+
+  .agrimetry-explorer-shell > .fx-sidebar,
+  .agrimetry-explorer-shell > .fx-sidebar.fx-sidebar-collapsed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1001;
+    width: 270px;
+    min-width: 270px;
+    flex-basis: 270px;
+    height: 100dvh;
+    padding: 30px 20px 22px;
+    align-items: stretch;
+    visibility: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+  }
+
+  .agrimetry-explorer-shell > .fx-sidebar.fx-sidebar-mobile-open {
+    transform: translateX(0);
+  }
+
+  .agrimetry-explorer-shell .fx-sidebar-toggle {
+    display: none;
+  }
+
+  .fx-sidebar-mobile-trigger {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1002;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #d7cebb;
+    border-radius: 10px;
+    color: #173d2b;
+    background: #fbf9f3;
+    box-shadow: 0 4px 14px #20392b20;
+    cursor: pointer;
+  }
+
+  .fx-sidebar-backdrop.is-visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(12,25,17,.42);
+  }
+}
+
+/* ACCESSIBILITY */
+@media (prefers-reduced-motion: reduce) {
+  .agrimetry-explorer-shell > .fx-sidebar,
+  .agrimetry-explorer-shell .fx-sidebar-toggle {
+    transition-duration: .01ms;
+  }
+}

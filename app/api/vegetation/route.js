@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { analyzeSentinelVegetation, SENTINEL_START_DATE, validateFarmGeometry } from "@/lib/vegetation/earth-search";
+import { getHlsHistory } from "@/lib/nasa/earth-observation";
 
 // Next.js Cache Components requires the default Node.js runtime.
 // Do not export `runtime` or `dynamic` from this route.
@@ -52,7 +53,27 @@ export async function POST(request) {
       return NextResponse.json({ error: "Scene cloud percentage must be between 0 and 100." }, { status: 400 });
     }
 
-    const result = await analyzeSentinelVegetation({ geometry, startDate, endDate, cloudLimit });
+    const outerRings = geometry.type === "Polygon"
+      ? [geometry.coordinates[0] || []]
+      : (geometry.coordinates || []).map((polygon) => polygon?.[0] || []);
+    const boundaryPoints = outerRings.flat().filter((point) => Number.isFinite(Number(point?.[0])) && Number.isFinite(Number(point?.[1])));
+    const centre = boundaryPoints.length ? {
+      longitude: (Math.min(...boundaryPoints.map((point) => Number(point[0]))) + Math.max(...boundaryPoints.map((point) => Number(point[0])))) / 2,
+      latitude: (Math.min(...boundaryPoints.map((point) => Number(point[1]))) + Math.max(...boundaryPoints.map((point) => Number(point[1])))) / 2,
+    } : null;
+    // HLS is optional context. Fetch it alongside Sentinel-2 so the historical
+    // series does not add its full request time after the main vegetation run.
+    const hlsPromise = centre
+      ? getHlsHistory(centre).catch((historyError) => ({
+        status: "unavailable", records: [], monthly: [],
+        reason: String(historyError?.message || "The HLS history service is unavailable.").slice(0, 220),
+      }))
+      : Promise.resolve({ status: "unavailable", records: [], monthly: [], reason: "A field-centre coordinate could not be determined." });
+    const [result, hlsHistory] = await Promise.all([
+      analyzeSentinelVegetation({ geometry, startDate, endDate, cloudLimit }),
+      hlsPromise,
+    ]);
+    result.hlsHistory = hlsHistory;
     return NextResponse.json(result, {
       headers: {
         "Cache-Control": "no-store",

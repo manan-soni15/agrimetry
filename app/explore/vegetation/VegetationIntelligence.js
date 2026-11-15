@@ -616,7 +616,7 @@ export default function VegetationIntelligence() {
       try {
         localStorage.setItem("agrimetry:completed-vegetation-analysis:v1", JSON.stringify({
           field: selectedField,
-          result: { summary: payload.summary, monthly: payload.monthly, phenology: payload.phenology || null, lowVegetation: payload.lowVegetation || null, fieldVariability: payload.fieldVariability || null },
+          result: { summary: payload.summary, monthly: payload.monthly, phenology: payload.phenology || null, lowVegetation: payload.lowVegetation || null, fieldVariability: payload.fieldVariability || null, hlsHistory: payload.hlsHistory || null },
           startDate, endDate, completedAt: new Date().toISOString(),
         }));
       } catch (storageError) { console.warn("Could not save completed field analysis for Land Storyteller:", storageError); }
@@ -669,7 +669,7 @@ export default function VegetationIntelligence() {
           <span className="vi-divider"/>
           <div className="vi-header-title"><small>FIELD INTELLIGENCE</small><strong>Vegetation analysis</strong></div>
         </div>
-        <div className="vi-header-actions"><span className="vi-source-pill"><i/> COPERNICUS SENTINEL-2</span><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore" className="vi-explore-link">Environmental explorer</Link></div>
+        <div className="vi-header-actions"><span className="vi-source-pill"><i/> SENTINEL-2 + NASA HLS</span><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore/map" className="vi-explore-link">Global farm map</Link></div>
       </header>
 
       <div className="vi-content">
@@ -679,7 +679,7 @@ export default function VegetationIntelligence() {
             <h1>Read the <em>green</em> story of your field.</h1>
             <p>Public Sentinel-2 scenes are discovered for the exact field boundary you select. Agrimetry reads the red, near-infrared and scene-classification COGs, masks clouds and shadows, calculates field-only NDVI and summarizes the best available scene for each month.</p>
           </div>
-          <div className="vi-intro-note"><Icon name="satellite" size={20}/><span>10 m red / NIR bands · 20 m SCL<br/><strong>No Google credentials or API key</strong></span></div>
+          <div className="vi-intro-note"><Icon name="satellite" size={20}/><span>10 m red / NIR bands · 20 m SCL<br/><strong>Sentinel-2 needs no key · HLS history uses NASA Earthdata</strong></span></div>
         </section>
 
         {fields.length === 0 ? (
@@ -708,7 +708,7 @@ export default function VegetationIntelligence() {
               <label className="vi-check-row"><input type="checkbox" checked={compareSeasons} onChange={(event) => setCompareSeasons(event.target.checked)}/><span>Compare with the same months last year<small>Runs a second analysis for the previous year after the main report. This takes extra time.</small></span></label>
               <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField || !startDate || !endDate}><Icon name={loading ? "refresh" : "leaf"} size={17}/>{loading ? "Analysing Sentinel-2 scenes…" : "Run vegetation analysis"}</button>
               {error && <div className="vi-error" role="alert"><Icon name="info" size={17}/><span>{error}</span></div>}
-              <div className="vi-source-note"><Icon name="info" size={15}/><p>Sentinel-2 is an ESA/Copernicus mission, not a NASA mission. Agrimetry discovers public Level-2A scenes through Element 84 Earth Search and processes their public Cloud-Optimized GeoTIFF assets directly. No Earth Engine account, API key or service-account environment variables are required.</p></div>
+              <div className="vi-source-note"><Icon name="info" size={15}/><p>Sentinel-2 is an ESA/Copernicus mission, not a NASA mission. Agrimetry discovers public Level-2A scenes through Element 84 Earth Search and processes their public Cloud-Optimized GeoTIFF assets directly. No Earth Engine account, API key or service-account environment variables are required for this main analysis. The optional historical HLS comparison uses NASA Earthdata and needs a server-side NASA_EARTHDATA_TOKEN.</p></div>
             </aside>
 
             <section className="vi-results-area">
@@ -792,7 +792,32 @@ export default function VegetationIntelligence() {
                       ) : <p>No month had a clear reading in both years, so a fair comparison is not possible. Try a higher cloud threshold or a different window.</p>)}
                     </section>
                   </div>
-                                    <div className="vi-analysis-grid">
+                  <section className="vi-white-panel vi-hls-history-panel">
+                    <div className="vi-panel-title">
+                      <div><span className="vi-overline">07B / LONG-TERM FIELD MEMORY</span><h2>How has this location changed since 2013?</h2><p>NASA HLS harmonizes Landsat 8/9 and Sentinel-2 observations on a common 30 m grid, extending the vegetation record beyond the selected Sentinel-2 window.</p></div>
+                      <span className="vi-panel-stamp">NASA HLS · 30 m</span>
+                    </div>
+                    {result.hlsHistory?.status === "available" && result.hlsHistory.monthly?.length ? (
+                      <>
+                        <div className="vi-hls-summary">
+                          <div><span>First record</span><strong>{result.hlsHistory.earliestDate || "—"}</strong></div>
+                          <div><span>Latest record</span><strong>{result.hlsHistory.latestDate || "—"}</strong></div>
+                          <div><span>Samples returned</span><strong>{result.hlsHistory.observationCount}</strong></div>
+                          <div><span>Months represented</span><strong>{result.hlsHistory.monthly.length}</strong></div>
+                        </div>
+                        <div className="vi-hls-chart-wrap">
+                          <div className="vi-chart-legend"><span><i/> Monthly HLS NDVI mean</span><span><i className="previous"/> NDVI scale −1 to 1</span></div>
+                          <div className="vi-table-scroll">
+                            <table><thead><tr><th>Month</th><th>HLS monthly NDVI</th><th>Observations</th><th>Landsat</th><th>Sentinel-2</th></tr></thead><tbody>{result.hlsHistory.monthly.slice(-36).map((item) => <tr key={item.month}><td>{formatMonth(item.month)}</td><td><div className="vi-hls-meter"><i style={{ width: `${Math.max(0, Math.min(100, ((item.meanNdvi + 1) / 2) * 100))}%` }}/></div><strong>{formatNdvi(item.meanNdvi)}</strong></td><td>{item.observationCount}</td><td>{item.landsatCount}</td><td>{item.sentinelCount}</td></tr>)}</tbody></table>
+                          </div>
+                        </div>
+                        <small className="vi-method-note">{result.hlsHistory.note}</small>
+                      </>
+                    ) : (
+                      <div className="vi-hls-unavailable"><p>{result.hlsHistory?.reason || "NASA HLS history has not been returned for this field yet."}</p>{result.hlsHistory?.status === "needs_token" && <a href="https://urs.earthdata.nasa.gov/" target="_blank" rel="noreferrer">Set up NASA Earthdata Login <Icon name="external" size={12}/></a>}</div>
+                    )}
+                  </section>
+                  <div className="vi-analysis-grid">
                     <section className="vi-white-panel vi-zones-panel">
                       <span className="vi-overline">08 / MANAGEMENT ZONES</span>
                       <h2>{fieldVariability?.available ? `The field is ${fieldVariability.uniformity}` : "Within-field zones unavailable"}</h2>
@@ -821,7 +846,7 @@ export default function VegetationIntelligence() {
                   </div>
                   <section className="vi-white-panel vi-observation-table"><div className="vi-panel-title"><div><span className="vi-overline">10 / MONTHLY OBSERVATIONS</span><h2>Observation record</h2></div><span className="vi-panel-stamp">Sentinel-2 L2A · Earth Search</span></div><div className="vi-table-scroll"><table><thead><tr><th>Month</th><th>Observation</th><th>Average green signal</th><th>Typical pixel</th><th>Scene cloud</th><th>Clear pixels</th></tr></thead><tbody>{result.monthly.map((item) => <tr key={item.month}><td>{formatMonth(item.month)}</td><td>{item.observedAt ? new Date(item.observedAt).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "No clear scene"}</td><td>{formatNdvi(item.meanNdvi)}</td><td>{formatNdvi(item.medianNdvi)}</td><td>{Number.isFinite(item.cloudCover) ? `${item.cloudCover.toFixed(1)}%` : "—"}</td><td>{item.validPixelCount.toLocaleString()}</td></tr>)}</tbody></table></div></section>
                   <section className="vi-caveats"><div><span className="vi-overline">READ THE DATA RESPONSIBLY</span><h3>What NDVI can—and cannot—tell you.</h3></div><ul>{result.caveats.map((item) => <li key={item}>{item}</li>)}</ul></section>
-                  <div className="vi-source-footer"><span>DATA: COPERNICUS SENTINEL-2 MSI L2A · {result.source.collection}</span><span>{result.source.attribution}</span><a href="https://earth-search.aws.element84.com/v1/collections/sentinel-2-c1-l2a" target="_blank" rel="noreferrer">Earth Search collection <Icon name="external" size={12}/></a></div>
+                  <div className="vi-source-footer"><span>DATA: COPERNICUS SENTINEL-2 MSI L2A · NASA HLS LANDSAT/SENTINEL-2 · {result.source.collection}</span><span>{result.source.attribution}</span><a href="https://earth-search.aws.element84.com/v1/collections/sentinel-2-c1-l2a" target="_blank" rel="noreferrer">Earth Search collection <Icon name="external" size={12}/></a></div>
                 </>
               )}
             </section>

@@ -377,3 +377,20 @@
 @media (max-width: 900px) {
   .vi-controls-panel { position: static; max-height: none; overflow: visible; }
 }
+
+/* Long-range NASA HLS history panel. */
+.vi-hls-history-panel { margin-top: 16px; }
+.vi-hls-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin: 16px 0; }
+.vi-hls-summary > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px; border: 1px solid #e9e3d5; border-radius: 9px; background: #fbfaf6; }
+.vi-hls-summary span { color: #828372; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.vi-hls-summary strong { color: #39553a; font-size: 15px; overflow-wrap: anywhere; }
+.vi-hls-chart-wrap { margin: 14px 0; }
+.vi-hls-meter { display: inline-block; width: min(130px, 42vw); height: 7px; margin-right: 8px; overflow: hidden; vertical-align: middle; border-radius: 99px; background: linear-gradient(90deg, #b8a6a0 0%, #d7c9a7 50%, #71965d 100%); }
+.vi-hls-meter i { display: block; height: 100%; border-right: 2px solid #375a39; background: rgba(255,255,255,.28); }
+.vi-hls-unavailable { padding: 13px 14px; border-radius: 9px; background: #f5f2e9; color: #777767; font-size: 12px; line-height: 1.55; }
+.vi-hls-unavailable p { margin: 0; overflow-wrap: anywhere; }
+.vi-hls-unavailable a { font-size: 11px; }
+@media (max-width: 760px) {
+  .vi-hls-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vi-hls-meter { width: 65px; }
+}

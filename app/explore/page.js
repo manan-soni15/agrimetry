@@ -1,11 +1,10 @@
-import FarmExplorer from "./FarmExplorer";
-import "./explore.css";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Explore | Agrimetry",
-  description: "Build an environmental fingerprint for your farm using NASA Earth observation and climate data.",
+  title: "Agrimetry | Global Farm Map",
+  description: "Select a field boundary and explore its satellite-derived agricultural intelligence.",
 };
 
 export default function ExplorePage() {
-  return <FarmExplorer />;
+  redirect("/explore/map");
 }

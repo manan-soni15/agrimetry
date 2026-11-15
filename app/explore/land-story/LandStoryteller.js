@@ -69,7 +69,7 @@ export default function LandStoryteller() {
   const chapter = story?.chapters?.[active];
 
   return <main className="land-story-page">
-    <header className="ls-topbar"><Link href="/explore" className="ls-brand"><span><Icon name="leaf"/></span> agrimetry<span className="ls-brand-dot">.</span></Link><Link href="/explore/vegetation" className="ls-back">Field analysis <Icon name="arrow"/></Link></header>
+    <header className="ls-topbar"><Link href="/explore/map" className="ls-brand"><span><Icon name="leaf"/></span> agrimetry<span className="ls-brand-dot">.</span></Link><Link href="/explore/vegetation" className="ls-back">Field analysis <Icon name="arrow"/></Link></header>
     <section className="ls-hero">
       <div className="ls-kicker"><Icon name="spark"/> INTELLIGENCE LAYER · GEMINI</div>
       <h1>The story <em>of your land.</em></h1>

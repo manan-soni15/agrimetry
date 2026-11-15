@@ -1,6 +1,10 @@
 /* Water-stress page extras. Layout classes come from ../vegetation/vegetation.css (vi-*). */
 .ws-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
 .ws-map-controls { flex-wrap: wrap; gap: 6px; }
+.ws-map-heading { min-width: 0; }
+.ws-map-field-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin: 5px 0 4px; color: #536a4d; font-size: 10px; }
+.ws-map-field-meta strong { font-size: 10px; font-weight: 750; }
+.ws-map-field-meta span { padding: 3px 7px; border: 1px solid #dfe5d8; border-radius: 999px; background: #f3f6ee; font-variant-numeric: tabular-nums; }
 .ws-map-controls select, .ws-map-controls input[type="date"] { min-height: 28px; padding: 0 8px; border: 1px solid #d8e2d1; border-radius: 5px; color: #3f5238; background: #fff; font: inherit; font-size: 11px; }
 .ws-layer-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; font-size: 11px; line-height: 1.5; color: #6f7a66; border-top: 1px solid rgba(146,116,81,.14); }
 .ws-layer-note svg { flex: none; margin-top: 2px; }
@@ -11,3 +15,32 @@
 .ws-period-list li { padding: 10px 12px; border: 1px solid #ece3cf; border-radius: 9px; background: #fbf7ea; }
 .ws-period-list strong { display: block; font-size: 12px; color: #3f5238; }
 .ws-period-list span { display: block; margin-top: 2px; font-size: 11px; color: #6f7a66; line-height: 1.5; }
+
+.ws-earth-observations { margin-top: 18px; }
+.ws-earth-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.ws-earth-card { min-width: 0; padding: 16px; border: 1px solid #e7e2d5; border-radius: 12px; background: #fcfbf7; }
+.ws-earth-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ws-earth-card-head h3 { margin: 5px 0 0; color: #354b36; font-size: 16px; line-height: 1.35; }
+.ws-data-state { flex: none; border: 1px solid #ded8c9; border-radius: 999px; padding: 4px 7px; color: #827963; font-size: 9px; font-weight: 750; letter-spacing: .07em; }
+.ws-data-state.is-ready { color: #376746; border-color: #c7d8c7; background: #eff5ed; }
+.ws-earth-highlight { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 18px 0 12px; }
+.ws-earth-highlight strong { color: #294f36; font-size: clamp(25px, 4vw, 35px); letter-spacing: -.04em; }
+.ws-earth-highlight strong small { font-size: 13px; font-weight: 650; letter-spacing: 0; }
+.ws-earth-highlight > span { color: #777b6d; font-size: 11px; }
+.ws-month-rain-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
+.ws-month-rain-list > div, .ws-eco-observations > div { display: flex; flex-direction: column; gap: 3px; padding: 9px; border-radius: 8px; background: #f2f1e9; min-width: 0; }
+.ws-month-rain-list span, .ws-eco-observations span { color: #7a806f; font-size: 10px; }
+.ws-month-rain-list strong, .ws-eco-observations strong { color: #40553e; font-size: 12px; }
+.ws-month-rain-list small { color: #8a8d80; font-size: 9px; }
+.ws-eco-observations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
+.ws-source-unavailable { margin: 14px 0; padding: 12px; border-radius: 8px; color: #777264; background: #f4f1e8; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.ws-source-unavailable p { margin: 0; }
+.ws-source-unavailable a, .vi-hls-unavailable a { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; color: #356545; font-weight: 700; text-decoration: none; }
+.ws-earth-footnote { display: flex; gap: 8px; align-items: flex-start; margin-top: 13px; padding: 11px 12px; border-radius: 8px; background: #f7f4eb; color: #777767; font-size: 10px; line-height: 1.55; }
+.ws-earth-footnote svg { flex: none; margin-top: 1px; }
+
+@media (max-width: 760px) {
+  .ws-earth-grid { grid-template-columns: 1fr; }
+  .ws-map-heading { width: 100%; }
+  .ws-month-rain-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

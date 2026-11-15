@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { area as calculateArea } from "@turf/area";
 
 const STORAGE_KEY = "agrimetry:global-farm-map:v1";
+const SELECTED_FIELD_KEY = "agrimetry:vegetation:selected-field:v1";
 const NASA_ATTRIBUTION = "Imagery provided by NASA Global Imagery Browse Services (GIBS), operated by NASA/GSFC ESDIS.";
 const FTW_PM_TILES_URL = "https://data.source.coop/ftw/global-field-boundaries/pmtiles/ftw-global-fields-2025.pmtiles";
 const FTW_ATTRIBUTION = "Field boundary predictions © Fields of the World / Taylor Geospatial Institute and Microsoft AI for Good Research Lab, CC BY 4.0.";
@@ -31,6 +32,36 @@ function Icon({ name, size = 18 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.info}</svg>;
 }
 
+function normalizeOuterRing(inputRing) {
+  if (!Array.isArray(inputRing)) return null;
+  const ring = [];
+  for (const point of inputRing) {
+    if (!Array.isArray(point) || point.length < 2) return null;
+    const longitude = Number(point[0]);
+    const latitude = Number(point[1]);
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude) ||
+        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) return null;
+    const coordinate = [longitude, latitude];
+    const previous = ring[ring.length - 1];
+    if (!previous || previous[0] !== longitude || previous[1] !== latitude) ring.push(coordinate);
+  }
+  if (ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]) ring.pop();
+  const unique = new Set(ring.map((point) => `${point[0]},${point[1]}`));
+  if (unique.size < 3) return null;
+  ring.push([...ring[0]]);
+  let signedArea = 0;
+  for (let i = 0; i < ring.length - 1; i += 1) {
+    signedArea += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  }
+  if (Math.abs(signedArea) < 1e-12) return null;
+  if (signedArea < 0) {
+    const openRing = ring.slice(0, -1).reverse();
+    return [...openRing, [...openRing[0]]];
+  }
+  return ring;
+}
+
 function polygonFeatures(geojson) {
   if (!geojson || typeof geojson !== "object") return [];
   let input = [];
@@ -43,14 +74,13 @@ function polygonFeatures(geojson) {
     const geometry = feature?.geometry;
     const polygons = geometry?.type === "Polygon" ? [geometry.coordinates] : geometry?.type === "MultiPolygon" ? geometry.coordinates : [];
     for (const coordinates of polygons) {
-      const ring = coordinates?.[0];
-      if (!Array.isArray(ring) || ring.length < 4) continue;
-      const valid = ring.every((point) => Array.isArray(point) && point.length >= 2 && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1])) && Math.abs(Number(point[0])) <= 180 && Math.abs(Number(point[1])) <= 90);
-      if (!valid) continue;
+      const ring = normalizeOuterRing(coordinates?.[0]);
+      if (!ring) continue;
       normalized.push({
         type: "Feature",
+        ...(feature.id !== undefined && feature.id !== null ? { id: feature.id } : {}),
         properties: { ...(feature.properties || {}), mode: "polygon", fieldName: feature.properties?.fieldName || feature.properties?.name || `Field ${normalized.length + 1}` },
-        geometry: { type: "Polygon", coordinates },
+        geometry: { type: "Polygon", coordinates: [ring] },
       });
     }
   }
@@ -139,16 +169,24 @@ export default function GlobalFarmMap() {
   const totalArea = useMemo(() => fields.reduce((sum, feature) => sum + featureArea(feature), 0), [fields]);
 
   const syncFields = useCallback((drawInstance) => {
-    if (!drawInstance) return;
+    if (!drawInstance) return null;
     const snapshot = drawInstance.getSnapshot().filter((feature) =>
       feature.geometry?.type === "Polygon" && !feature.properties?.midPoint && !feature.properties?.selectionPoint && !feature.properties?.closingPoint,
     );
     setFields(snapshot);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      const previousSelection = JSON.parse(localStorage.getItem(SELECTED_FIELD_KEY) || "null");
+      const stillSelected = snapshot.find((feature) => String(feature.id) === String(previousSelection?.id));
+      const nextSelection = stillSelected || snapshot[0] || null;
+      if (nextSelection) localStorage.setItem(SELECTED_FIELD_KEY, JSON.stringify(nextSelection));
+      else localStorage.removeItem(SELECTED_FIELD_KEY);
       setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      return snapshot;
     } catch (error) {
       console.warn("Could not persist farm boundaries in this browser:", error);
+      setNotice("The field is visible on the map, but browser storage could not save it. Check your browser storage settings and try Save fields again.");
+      return null;
     }
   }, []);
 
@@ -527,27 +565,39 @@ export default function GlobalFarmMap() {
     const draw = drawRef.current;
     if (!draw || !selectedFtwCandidate) return;
     try {
+      const normalized = polygonFeatures(selectedFtwCandidate)[0];
+      if (!normalized) throw new Error("This predicted outline has invalid coordinates. Choose another outline or trace it manually.");
       const fieldNumber = fields.length + 1;
+      const localId = window.crypto?.randomUUID?.() || `ftw-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const candidateId = selectedFtwCandidate.properties?.candidateId || `ftw-${selectedFtwCandidate.id || Date.now()}`;
       const feature = {
-        ...selectedFtwCandidate,
+        ...normalized,
+        id: localId,
         properties: {
-          ...selectedFtwCandidate.properties,
-          mode: "polygon",
+          ...normalized.properties, candidateId, mode: "polygon",
           fieldName: `FTW field ${fieldNumber}`,
           source: "Fields of the World / PRUE",
-          reviewRequired: true,
-          farmerVerified: false,
+          reviewRequired: true, farmerVerified: false,
         },
       };
-      const result = draw.addFeatures([feature]);
-      const wasAdded = !Array.isArray(result) || result.some((item) => item.valid !== false);
-      if (!wasAdded) throw new Error("The predicted outline could not be added. Trace the boundary manually instead.");
+      // Snapshot membership is authoritative; addFeatures return values vary
+      // across Terra Draw versions.
+      draw.addFeatures([feature]);
+      const inserted = draw.getSnapshot().find((item) => String(item.id) === String(localId));
+      if (!inserted) throw new Error("Terra Draw could not add this outline after geometry repair. Choose another predicted outline or trace it manually.");
       draw.setMode("select");
       setTool("select");
-      syncFields(draw);
+      const savedSnapshot = syncFields(draw);
+      if (!savedSnapshot) {
+        draw.removeFeatures?.([localId]);
+        throw new Error("The outline was added but could not be saved in this browser. Check browser storage and try again.");
+      }
+      const savedFeature = savedSnapshot.find((item) => String(item.id) === String(localId)) || inserted;
+      localStorage.setItem(SELECTED_FIELD_KEY, JSON.stringify(savedFeature));
       setSelectedFtwCandidate(null);
       mapRef.current?.getSource("ftwSelected")?.setData({ type: "FeatureCollection", features: [] });
-      setNotice("Predicted field outline added to your editable fields. Adjust its vertices to match the real farm boundary before analysis.");
+      setDetectionError("");
+      setNotice("Predicted field saved and selected. Review its outline and adjust vertices before analysis.");
     } catch (error) {
       setDetectionError(error.message || "Could not add this predicted field outline.");
     }
@@ -555,8 +605,8 @@ export default function GlobalFarmMap() {
 
   function saveBoundaries() {
     if (!drawRef.current) return;
-    syncFields(drawRef.current);
-    setNotice("Field boundaries saved in this browser.");
+    const saved = syncFields(drawRef.current);
+    if (saved) setNotice(`${saved.length} field boundary${saved.length === 1 ? "" : "ies"} saved in this browser.`);
   }
 
   function clearBoundaries() {
@@ -626,12 +676,19 @@ export default function GlobalFarmMap() {
     }]);
     draw.setMode("select");
     setTool("select");
+    syncFields(draw);
     setNotice("Demo boundary added near the map centre. This is illustrative geometry; replace it with the true farm boundary.");
   }
 
   async function focusField(feature) {
     const ring = feature.geometry.coordinates?.[0] || [];
     if (!ring.length || !mapRef.current) return;
+    try {
+      localStorage.setItem(SELECTED_FIELD_KEY, JSON.stringify(feature));
+    } catch (error) {
+      console.warn("Could not update the selected farm field in browser storage:", error);
+      setNotice("This field is visible on the map, but the selected-field setting could not be saved in browser storage.");
+    }
     const maplibregl = await import("maplibre-gl");
     const bounds = new maplibregl.LngLatBounds(ring[0], ring[0]);
     ring.forEach((coordinate) => bounds.extend(coordinate));
@@ -645,7 +702,7 @@ export default function GlobalFarmMap() {
     <main className="agm-shell">
       <header className="agm-header">
         <div className="agm-header-brand">
-          <Link href="/explore" className="agm-back-link" aria-label="Back to farm explorer"><Icon name="back" size={18} /></Link>
+          <Link href="/" className="agm-back-link" aria-label="Back to Agrimetry home"><Icon name="back" size={18} /></Link>
           <Link href="/" className="agm-brand"><span className="agm-brand-mark"><Icon name="leaf" size={19} /></span><span>agrimetry<span className="agm-brand-dot">.</span></span></Link>
           <span className="agm-header-divider" />
           <div className="agm-header-title"><span>FIELD INTELLIGENCE</span><strong>Global farm map</strong></div>
@@ -772,3 +829,4 @@ export default function GlobalFarmMap() {
     </main>
   );
 }
+

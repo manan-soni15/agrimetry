@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const PRIORITY_OPTIONS = [
   { id: 'water', label: 'Conserve water', icon: 'droplet' },
@@ -10,9 +10,12 @@ const PRIORITY_OPTIONS = [
   { id: 'income', label: 'Diversify income', icon: 'chart' },
 ];
 
-const NEXT_LAYERS = [
-  { code: 'SMAP', title: 'Soil moisture', detail: 'Surface and root-zone moisture', status: 'Next integration', icon: 'droplet' },
-  { code: 'GPM', title: 'Precipitation', detail: 'Satellite rainfall estimates', status: 'Next integration', icon: 'rain' },
+const FARM_PROFILE_KEY = 'agrimetry:farm-profile:v1';
+
+const DEEPER_INSIGHTS = [
+  { code: 'VEGETATION', title: 'Crop greenness & growth', detail: 'Sentinel-2 NDVI, phenology and HLS historical context', icon: 'leaf', href: '/explore/vegetation', action: 'Open vegetation intelligence' },
+  { code: 'SOIL', title: 'Soil condition', detail: 'SoilGrids properties with satellite soil-moisture context', icon: 'sprout', href: '/explore/soil-health', action: 'Open soil health' },
+  { code: 'WATER', title: 'Water stress & rainfall', detail: 'NASA POWER baseline with GPM rainfall and ECOSTRESS ET context', icon: 'droplet', href: '/explore/water-stress', action: 'Open water stress' },
 ];
 
 function Icon({ name, size = 18, strokeWidth = 1.7 }) {
@@ -242,7 +245,7 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
           <div className="fx-source-card-foot">NASA Earth observations + local farm context</div>
         </div>
 
-        <div className="fx-note-card"><span className="fx-note-icon"><Icon name="info" size={17} /></span><p><strong>Built for honest insight.</strong> Satellite and gridded climate data provide environmental context. They do not replace field soil tests or local agronomic advice.</p></div>
+        <div className="fx-note-card"><span className="fx-note-icon"><Icon name="info" size={17} /></span><p><strong>Built for honest insight.</strong> Satellite and gridded climate data provide environmental context, not field measurements. Your farm profile is saved locally in this browser and does not replace field soil tests or local agronomic advice.</p></div>
       </aside>
     </div>
   );
@@ -302,14 +305,14 @@ function Dashboard({ farm, result, onEdit }) {
       </div>
 
       <section className="fx-layers-section" id="fx-roadmap">
-        <div className="fx-section-heading"><div><span className="fx-overline">04 / EXPANDING THE FINGERPRINT</span><h2>More layers. A fuller picture.</h2></div><span className="fx-coming-label">INTEGRATION ROADMAP</span></div>
+        <div className="fx-section-heading"><div><span className="fx-overline">04 / FIELD INVESTIGATION</span><h2>Continue into field intelligence.</h2></div><span className="fx-coming-label">AVAILABLE MODULES</span></div>
         <div className="fx-next-grid">
-          {NEXT_LAYERS.map((layer, index) => <article className="fx-next-card" key={layer.code}><div className="fx-next-top"><span className="fx-next-icon"><Icon name={layer.icon} size={20} /></span><span>0{index + 2}</span></div><span className="fx-next-code">NASA {layer.code}</span><h3>{layer.title}</h3><p>{layer.detail}. Now available as field-level water-stress analysis plus NASA GIBS map layers.</p><Link href="/explore/water-stress" className="fx-roadmap-status"><i /> Open water stress</Link></article>)}
+          {DEEPER_INSIGHTS.map((layer, index) => <article className="fx-next-card" key={layer.code}><div className="fx-next-top"><span className="fx-next-icon"><Icon name={layer.icon} size={20} /></span><span>0{index + 1}</span></div><span className="fx-next-code">{layer.code}</span><h3>{layer.title}</h3><p>{layer.detail}. Open the module to inspect its data, evidence and limitations.</p><Link href={layer.href} className="fx-roadmap-status"><i /> {layer.action}</Link></article>)}
         </div>
       </section>
 
       <section className="fx-farm-context-panel">
-        <div className="fx-farm-context-copy"><span className="fx-overline">YOUR FARM CONTEXT</span><h2>Environmental data is only one part of the story.</h2><p>Your crop history, soil information, irrigation access and priorities will help Agrimetry compare rotation strategies responsibly. The next step is to connect these details to crop-specific requirements.</p><button className="fx-primary-button" onClick={onEdit}>Review farm details <Icon name="arrow" size={17} /></button></div>
+        <div className="fx-farm-context-copy"><span className="fx-overline">YOUR FARM CONTEXT</span><h2>Environmental data is only one part of the story.</h2><p>Your crop history, soil information, irrigation access and priorities are saved in this browser and shown here as farm context. They do not yet alter satellite calculations or personalize the other intelligence modules.</p><button className="fx-primary-button" onClick={onEdit}>Review farm details <Icon name="arrow" size={17} /></button></div>
         <div className="fx-farm-details-grid">
           <div><small>PREVIOUS CROP</small><strong>{farm.previousCrop || 'Not supplied'}</strong></div>
           <div><small>SOIL TYPE</small><strong>{farm.soilType || 'Not supplied'}</strong></div>
@@ -346,6 +349,36 @@ export default function FarmExplorer() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [activeNav, setActiveNav] = useState('overview');
+  const [farmProfileHydrated, setFarmProfileHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(FARM_PROFILE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setFarm((current) => ({
+            ...current,
+            ...parsed,
+            priorities: Array.isArray(parsed.priorities) ? parsed.priorities.filter((item) => PRIORITY_OPTIONS.some((option) => option.id === item)) : current.priorities,
+          }));
+        }
+      }
+    } catch (storageError) {
+      console.warn('Saved farm profile could not be restored:', storageError);
+    } finally {
+      setFarmProfileHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!farmProfileHydrated) return;
+    try {
+      localStorage.setItem(FARM_PROFILE_KEY, JSON.stringify(farm));
+    } catch (storageError) {
+      console.warn('Farm profile could not be saved in this browser:', storageError);
+    }
+  }, [farm, farmProfileHydrated]);
 
   async function handleSearch() {
     setSearchError('');
@@ -448,8 +481,8 @@ export default function FarmExplorer() {
         <BrandMark light />
         <div className="fx-workspace-label">WORKSPACE</div>
         <nav className="fx-nav" aria-label="Application navigation">
-          <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}><Icon name="grid" size={17} /><span>Farm overview</span></button>
-          <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
+          <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}><Icon name="grid" size={17} /><span>Farm setup</span></button>
+          <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Climate overview</span>{result && <i className="fx-nav-live" />}</button>
           <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
           <Link href="/explore/vegetation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Field vegetation</span><em>LIVE</em></Link>
           <Link href="/explore/land-story" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="book-open" size={17} /><span>AI Land Storyteller</span><em>AI</em></Link>
@@ -459,8 +492,6 @@ export default function FarmExplorer() {
           <Link href="/explore/rotation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Rotation engine</span><em>NEW</em></Link>
           <Link href="/explore/replay" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="calendar" size={17} /><span>Climate replay</span><em>NEW</em></Link>
           <Link href="/explore/passport" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Evidence passport</span><em>NEW</em></Link>
-          <button onClick={() => handleNavClick('rotation')}><Icon name="sprout" size={17} /><span>Rotation explorer</span><em>SOON</em></button>
-          <button onClick={() => handleNavClick('climate')}><Icon name="calendar" size={17} /><span>Climate replay</span><em>SOON</em></button>
         </nav>
         <div className="fx-sidebar-bottom">
           <div className="fx-side-earth"><div className="fx-earth-orbit"><span /></div><span>EARTH DATA, MADE USEFUL.</span></div>
@@ -471,7 +502,7 @@ export default function FarmExplorer() {
 
       <div className="fx-main-area">
         <header className="fx-topbar">
-          <div className="fx-breadcrumb"><span>AGRIMETRY</span><Icon name="chevron" size={13} /><strong>{result ? 'Environmental data' : 'Farm overview'}</strong></div>
+          <div className="fx-breadcrumb"><span>AGRIMETRY</span><Icon name="chevron" size={13} /><strong>{result ? 'Climate overview' : 'Farm setup'}</strong></div>
           <div className="fx-topbar-right"><span className="fx-topbar-status"><i /> POWER API READY</span><span className="fx-avatar">A</span></div>
         </header>
 

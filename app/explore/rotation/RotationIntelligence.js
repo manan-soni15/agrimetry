@@ -28,6 +28,7 @@ function Icon({ name, size = 18 }) {
     info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></>,
     external: <><path d="M14 3h7v7m0-7-9 9"/><path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></>,
     map: <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></>,
+    droplets: <><path d="M12 3s-6 6.2-6 10a6 6 0 0 0 12 0c0-3.8-6-10-6-10Z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.info}</svg>;
 }
@@ -130,18 +131,24 @@ export default function RotationIntelligence() {
 
   async function loadSoil() {
     let layers = null;
+    let soilMoisture = null;
     let note = null;
     try {
       const response = await fetch("/api/soil-health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ field: selectedField }) });
       const payload = await response.json().catch(() => ({}));
-      if (response.ok && payload.layers) layers = payload.layers;
-      else note = payload.error || "SoilGrids data could not be loaded.";
-    } catch { note = "SoilGrids data could not be loaded."; }
+      if (response.ok) {
+        layers = payload.layers || null;
+        soilMoisture = payload.soilMoisture || null;
+        note = payload.warnings?.join(" ") || (!layers ? "Mapped soil properties are unavailable. Rotation scoring continues with the information that is available." : null);
+      } else note = payload.error || `Soil and water context could not be loaded (HTTP ${response.status}).`;
+    } catch (error) {
+      note = error?.message || "Soil and water context could not be loaded.";
+    }
     let test = null;
     try { test = JSON.parse(localStorage.getItem(TEST_KEY_PREFIX + selectedFieldId) || "null"); } catch {}
     const profile = buildSoilProfile(layers, test);
     const soil = soilForEngine(profile);
-    return { soil, profile, note, usedTest: profile.farmerValuesUsed.length > 0, usedSoilGrids: Boolean(layers) };
+    return { soil, profile, note, soilMoisture, usedTest: profile.farmerValuesUsed.length > 0, usedSoilGrids: Boolean(layers) };
   }
 
   async function runAnalysis(event) {
@@ -274,7 +281,7 @@ export default function RotationIntelligence() {
               <div className="ro-chips">{CASH_CROPS.map((crop) => <label key={crop.id} className={`ro-chip ${marketCrops.includes(crop.id) ? "on" : ""}`}><input type="checkbox" checked={marketCrops.includes(crop.id)} onChange={() => toggle(marketCrops, setMarketCrops, crop.id)}/>{crop.name.split(" (")[0]}</label>)}</div>
               <label className="vi-check-row"><input type="checkbox" checked={specifyEquipment} onChange={(event) => setSpecifyEquipment(event.target.checked)}/><span>I will list my equipment<small>Otherwise equipment fit is left neutral.</small></span></label>
               {specifyEquipment && <div className="ro-equip">{EQUIPMENT.map((item) => <label key={item.id}><input type="checkbox" checked={equipment.includes(item.id)} onChange={() => toggle(equipment, setEquipment, item.id)}/>{item.label}</label>)}</div>}
-              <label className="vi-check-row"><input type="checkbox" checked={useSoil} onChange={(event) => setUseSoil(event.target.checked)}/><span>Use soil data<small>Fetches SoilGrids and adds any soil test you saved on the Soil health page. This can add up to a minute.</small></span></label>
+              <label className="vi-check-row"><input type="checkbox" checked={useSoil} onChange={(event) => setUseSoil(event.target.checked)}/><span>Use soil data<small>Fetches mapped soil properties, NASA soil-water history and your saved soil test. If one service fails, scoring continues with the remaining inputs.</small></span></label>
 
               <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField}><Icon name={loading ? "refresh" : "rotate"} size={17}/>{loading ? "Comparing rotations…" : "Compare rotations"}</button>
               {error && <div className="vi-error" role="alert"><Icon name="info" size={17}/><span>{error}</span></div>}
@@ -292,7 +299,8 @@ export default function RotationIntelligence() {
 
                   {(result.strategies.notices || []).map((notice) => <div className="vi-error sh-notice" role="status" key={notice}><Icon name="info" size={17}/><span>{notice}</span></div>)}
                   {result.strategies.message && <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>{result.strategies.message}</span></div>}
-                  {result.soilInfo.note && <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>{result.soilInfo.note} Scoring continues without it{result.soilInfo.usedTest ? ", using your saved soil test" : ""}.</span></div>}
+                  {result.soilInfo.note && <div className="sh-service-notice" role="status"><span className="sh-service-notice-icon"><Icon name="info" size={17}/></span><div><strong>{result.soilInfo.soilMoisture?.available && result.soilInfo.soilMoisture.kind === "wetness" ? "Using a broader NASA water dataset" : "Some environmental data could not be loaded"}</strong><p>{result.soilInfo.note} Rotation scoring continues with available inputs; missing soil properties remain unknown rather than being replaced with invented values.</p></div></div>}
+                  {result.soilInfo.soilMoisture?.available && <section className="vi-story-panel sh-rotation-moisture"><div className="vi-story-intro"><span className="vi-story-leaf"><Icon name="droplets" size={21}/></span><div><span className="vi-overline">{result.soilInfo.soilMoisture.kind === "smap" ? "NASA SMAP · LANDSCAPE WATER MEMORY" : "NASA POWER · LANDSCAPE WETNESS CONTEXT"}</span><h2>{result.soilInfo.soilMoisture.story?.headline || "Recent soil-water context"}</h2><p>{result.soilInfo.soilMoisture.story?.observations?.join(" ") || "Recent surface and root-zone moisture estimates add context to this field's wider landscape."}</p></div></div><p className="vi-method-note">This approximately {Math.round((result.soilInfo.soilMoisture.source?.nativeResolutionMetres || 9000) / 1000)} km gridded water estimate is shown as context only. It does not replace pH, texture or bulk-density inputs and is not used as a soil-fit score.</p></section>}
 
                   {best && current && (
                     <section className="vi-story-panel"><div className="vi-story-intro"><span className="vi-story-leaf"><Icon name="rotate" size={21}/></span><div><span className="vi-overline">SUMMARY</span><h2>{best.total > current.total + 3 ? "A different rotation scores higher for your priorities" : "Your rotation is already close to the best options"}</h2><p>Your current rotation scores <strong>{current.total.toFixed(0)}</strong> out of 100. The top alternative, <strong>{best.crops.join(" → ")}</strong>, scores <strong>{best.total.toFixed(0)}</strong>. Scores compare options for your own priorities and local conditions; open each card for the reasons, risks and missing information.</p></div></div></section>
@@ -353,9 +361,9 @@ export default function RotationIntelligence() {
                     <li>Climate is a 25-year monthly average from NASA POWER (about 50 km grid). Year-to-year variation, frost, heat spikes and flood risk are not modelled.</li>
                     <li>Rotations are compared as fixed cycles with one crop per season slot. Intercropping, relay cropping, perennials, tillage and fertiliser practice are not modelled.</li>
                     <li>Green-manure and fodder crops are limited to one per cycle so suggestions remain productive. Soil nutrients (N, P, K) and salinity are not assessed.</li>
-                    <li>Soil comes from SoilGrids (250 m model) and any soil test you entered; a recent test on your own field is more reliable.</li>
+                    <li>Soil compatibility uses available SoilGrids mapped properties (250 m) and any soil test you entered. NASA soil-water estimates are separate landscape-scale context and is not substituted for pH, texture or bulk density. A recent test from your own field is more reliable.</li>
                   </ul></section>
-                  <div className="vi-source-footer"><span>DATA: NASA POWER (MERRA-2) · ISRIC SOILGRIDS · GENERAL CROP GUIDANCE (FAO-STYLE)</span><span>{result.strategies.candidateCount?.toLocaleString()} valid crop sequences evaluated.</span><Link href="/explore/soil-health">Edit soil test <Icon name="external" size={12}/></Link></div>
+                  <div className="vi-source-footer"><span>DATA: NASA POWER (MERRA-2) · NASA SMAP · ISRIC SOILGRIDS · GENERAL CROP GUIDANCE (FAO-STYLE)</span><span>{result.strategies.candidateCount?.toLocaleString()} valid crop sequences evaluated.</span><Link href="/explore/soil-health">Edit soil test <Icon name="external" size={12}/></Link></div>
                 </>
               )}
             </section>

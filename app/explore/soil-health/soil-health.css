@@ -21,3 +21,29 @@
 .sh-texture-row small { text-align: right; font-size: 10px; }
 .sh-meta-list { margin: 10px 0; padding-left: 16px; display: grid; gap: 6px; font-size: 12px; line-height: 1.5; color: #46553f; }
 .vi-table-scroll td small { color: #8a927f; }
+
+/* NASA SMAP is a separate, landscape-scale water history, not a substitute
+   for static soil chemistry or texture. Keep its story visually distinct. */
+.sh-smap-panel { margin-top: 16px; }
+.sh-smap-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.sh-smap-metrics article { min-width: 0; padding: 13px 14px; border: 1px solid #dce8d9; border-radius: 10px; background: #f6faf3; display: grid; gap: 5px; }
+.sh-smap-metrics article > span, .sh-smap-story-grid article > span { color: #74836d; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.sh-smap-metrics strong { color: #2e5737; font-size: clamp(17px, 2vw, 23px); line-height: 1.2; overflow-wrap: anywhere; }
+.sh-smap-metrics small { color: #7d8877; font-size: 10px; line-height: 1.4; }
+.sh-smap-story-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sh-smap-story-grid article { min-width: 0; padding: 14px; border-radius: 10px; background: #f7f8f1; border: 1px solid #e4e8dc; }
+.sh-smap-story-grid strong { display: block; margin: 6px 0; color: #3f563d; font-size: 14px; line-height: 1.35; }
+.sh-smap-story-grid p { margin: 0; color: #5d6a57; font-size: 12px; line-height: 1.6; }
+.sh-rotation-moisture { margin-top: 14px; }
+.sh-no-soil-map { margin-top: 14px; border-style: dashed; }
+.sh-no-soil-map p { max-width: 760px; color: #68745f; font-size: 13px; line-height: 1.65; }
+@media (max-width: 760px) { .sh-smap-metrics { grid-template-columns: 1fr; } .sh-smap-story-grid { grid-template-columns: 1fr; } .sh-texture-row { grid-template-columns: 66px minmax(0, 1fr); } .sh-texture-row small { grid-column: 2; } }
+
+
+/* Compact service-status note: informative without dominating the analysis story. */
+.sh-service-notice { display: flex; align-items: flex-start; gap: 11px; margin: 12px 0 16px; padding: 12px 15px; border: 1px solid #d9e4d3; border-left: 3px solid #7c9a68; border-radius: 11px; background: rgba(245, 248, 239, .92); color: #405541; }
+.sh-service-notice-icon { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px; background: #e6eedf; color: #52734c; }
+.sh-service-notice strong { display: block; margin: 1px 0 3px; color: #34513a; font-size: 12px; font-weight: 750; letter-spacing: .01em; }
+.sh-service-notice p { margin: 0; color: #687763; font-size: 12px; line-height: 1.55; }
+@media (max-width: 640px) { .sh-service-notice { padding: 10px 11px; gap: 8px; } .sh-service-notice p { font-size: 11px; } }
+

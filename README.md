@@ -4,7 +4,7 @@
 
 Agrimetry is a global agricultural decision-support prototype. A farmer draws their real field boundary, reads what satellites and NASA climate data say about that field, and compares crop rotations with every score explained and every source labelled. It is being developed for the **NASA Space Apps Challenge 2026** crop-rotation challenge.
 
-It combines NASA resources (NASA POWER climate and soil wetness, NASA GIBS imagery) with openly accessible non-NASA data (Sentinel-2, ISRIC SoilGrids, Fields of the World, OpenStreetMap). It is built to support farmer decisions. It does **not** replace local agronomic advice or field measurements.
+It combines NASA resources (NASA POWER climate, NASA SMAP soil-moisture history and NASA GIBS imagery) with openly accessible non-NASA data (Sentinel-2, ISRIC SoilGrids, Fields of the World, OpenStreetMap). SoilGrids and NASA SMAP are independent sources: mapped soil chemistry and texture are never fabricated from satellite moisture data. It is built to support farmer decisions. It does **not** replace local agronomic advice or field measurements.
 
 > **Project principle:** from satellite observations to farm-specific agricultural intelligence, with transparent evidence, resolution and uncertainty.
 
@@ -32,8 +32,8 @@ All seven features on the project roadmap have a working first version. They are
 | 1 | Field Vegetation Intelligence | `/explore/vegetation` | Sentinel-2 L2A (ESA, not NASA) |
 | 2 | Soil Moisture & Water Stress | `/explore/water-stress` | NASA POWER; NASA GIBS (SMAP, IMERG imagery) |
 | 3 | Automatic Bare-Field Detection | `/explore/bare-field` | Sentinel-2 NDVI + NASA POWER rainfall |
-| 4 | Soil Health Intelligence | `/explore/soil-health` | ISRIC SoilGrids + your own soil test |
-| 5 | Crop Rotation Intelligence Engine | `/explore/rotation` | NASA POWER + SoilGrids + crop database |
+| 4 | Soil Health Intelligence | `/explore/soil-health` | ISRIC SoilGrids WCS/REST fallback + NASA POWER SMAP + your own soil test |
+| 5 | Crop Rotation Intelligence Engine | `/explore/rotation` | NASA POWER + available SoilGrids / farmer soil test + crop database; SMAP is contextual only |
 | 6 | Historical Climate Replay | `/explore/replay` | NASA POWER (25 years, monthly and daily) |
 | 7 | Evidence Passport | `/explore/passport` | Everything above |
 
@@ -63,7 +63,7 @@ They sit on a foundation of a landing page (`/`), an Environmental Explorer (`/e
 
 ## 2. Quick start
 
-**Requirements:** Node.js 20.9 or newer, npm, and internet access (map tiles, geocoding, NASA POWER, Earth Search, SoilGrids and public Sentinel-2 files are all fetched live). No API keys, accounts or `.env` file are needed.
+**Requirements:** Node.js 20.9 or newer, npm, and internet access (map tiles, geocoding, NASA POWER, Earth Search, ISRIC and public Sentinel-2 files are fetched live). No API keys, accounts or `.env` file are needed for these public endpoints. Public services can be temporarily unavailable; the soil workflow returns partial results and keeps farmer-entered soil tests usable.
 
 ```bash
 git clone https://github.com/manan-soni15/agrimetry.git
@@ -141,16 +141,17 @@ Built on the monthly Sentinel-2 NDVI series (up to 12 months) plus NASA POWER ra
 
 ### 4. Soil Health Intelligence — `/explore/soil-health`
 
-- **ISRIC SoilGrids 2.0** (250 m, public, no key): organic carbon, pH, sand, silt, clay and bulk density at six depths (0–5 to 100–200 cm), shown with the 90 % prediction interval and a plain confidence marker.
-- **Staged lookups**, because SoilGrids is a slow research service (about a second per property, depth and statistic): a one-layer probe finds a sample point with data (trying nearby points for urban, water or masked cells and saying so), the 0–30 cm means load first, and deeper layers and prediction intervals load on demand. Results are cached on the server for a week.
-- **Your own soil test:** pH, organic carbon (%), sand/silt/clay (%) and bulk density. Stored in this browser per field, they replace the modelled topsoil values, the interpretation updates instantly, and notable disagreements with SoilGrids are flagged.
-- **Soil Intelligence Profile:** USDA texture class, organic-carbon, pH and bulk-density ratings (topsoil = depth-weighted 0–30 cm), possible limitations (low organic carbon, strong acidity or alkalinity, compaction, light or heavy soils) and what each means for crops and rotations.
+- **ISRIC SoilGrids 2.0** (250 m, public, no key): organic carbon, pH, sand, silt, clay and bulk density at six depths (0–5 to 100–200 cm), shown with the 90 % prediction interval when available. ISRIC has paused its beta REST API, so the app tries the documented WCS map service first and retains REST as a short-budget secondary path. WCS is queried for a small raster subset around a representative field point, not a full polygon-wide soil survey.
+- **Failure-tolerant soil lookup:** SoilGrids WCS and REST are optional upstream sources. For valid geometry, the API returns `ready`, `partial` or `degraded` status when an upstream service fails, so the page, rotation engine and Evidence Passport can continue. Missing soil properties stay unknown; the rotation engine treats missing soil-fit inputs neutrally.
+- **NASA SMAP L4 through NASA POWER:** daily surface moisture (`SFMC`, 0–5 cm), root-zone moisture (`RZMC`, 0–100 cm), profile moisture and available percentiles. This is a separate dynamic water-history layer at roughly 9 km native resolution (POWER serves it at about 0.09°), with a record beginning in 2015. It adds landscape-scale context and is never converted into pH, texture, organic-carbon concentration or bulk density.
+- **Your own soil test:** pH, organic carbon (%), sand/silt/clay (%) and bulk density. Stored in this browser per field, they take priority over mapped values for the properties you entered, and notable disagreements with SoilGrids are flagged when a mapped estimate is available. Farmer-entered data remains usable when SoilGrids is offline.
+- **Soil Intelligence Profile:** USDA texture class, organic-carbon, pH and bulk-density ratings (topsoil = depth-weighted 0–30 cm), possible limitations (low organic carbon, strong acidity or alkalinity, compaction, light or heavy soils) and what each means for crops and rotations. If no soil-profile values exist, the profile says so rather than inventing a result.
 
 ### 5. Crop Rotation Intelligence Engine — `/explore/rotation`
 
 Compares the farmer's current rotation with generated alternatives for a saved field. All scoring runs in the browser from pure functions in `lib/rotation`, so changing inputs re-ranks instantly once climate and soil are loaded.
 
-- **Inputs:** current rotation (2–4 crops in order), one or two crops per year, irrigation level (rainfed / limited / reliable), priorities (water, soil health, market, forage, equipment; 1–5 each), optional crops you can sell, optional equipment, and soil data (SoilGrids plus any saved soil test).
+- **Inputs:** current rotation (2–4 crops in order), one or two crops per year, irrigation level (rainfed / limited / reliable), priorities (water, soil health, market, forage, equipment; 1–5 each), optional crops you can sell, optional equipment, and available soil data (SoilGrids plus any saved soil test). NASA SMAP is shown separately as landscape water context and does not enter the soil compatibility score.
 - **Climate:** 25-year monthly normals from NASA POWER (`/api/climate-normals`). Usable water counts in-season rain at 80 %, a share of the previous two months' rain, and irrigation; 85 % of a crop's typical water use counts as full coverage. Temperature is a hard condition: water cannot compensate for the wrong season.
 - **Strategies:** every valid sequence of the **21 crops** in the database is scored. The page shows the current rotation plus the best sequence for your priorities, a soil-building focus, a water-saving focus and (if you listed sale crops) a market focus.
 - **Ten explainable criteria (0–100 each),** weighted by your priorities (weights are shown):
@@ -188,7 +189,7 @@ Replays rotations against every year of NASA POWER weather since 2001 (monthly t
 
 ### 7. Evidence Passport — `/explore/passport`
 
-A printable evidence report for the current rotation and every suggested alternative, built from the farm details entered on the Rotation page plus live data for the saved field (NASA POWER climate and water stress, the SoilGrids profile and any saved soil test, and optionally Sentinel-2 vegetation). Per-source progress is shown while loading, and satellite vegetation can be skipped while waiting.
+A printable evidence report for the current rotation and every suggested alternative, built from the farm details entered on the Rotation page plus live data for the saved field (NASA POWER climate and water stress, available SoilGrids profile and any saved soil test, NASA SMAP water history when available, and optionally Sentinel-2 vegetation). SoilGrids and SMAP are recorded as separate sources. Per-source progress is shown while loading, and satellite vegetation can be skipped while waiting.
 
 For each rotation the passport contains:
 
@@ -223,18 +224,18 @@ Working rules: unknown is shown as unknown (never as zero or "bare"); missing in
 
 | Source | Provider | NASA? | Used for | Access / notes |
 |---|---|---|---|---|
-| NASA POWER daily and monthly point APIs | NASA POWER (MERRA-2 reanalysis) | Yes | Climate, rain, temperature, soil wetness; baselines, replay, water stress, rotation | Public REST API, no key. About 50 km grid; about two days of lag. |
+| NASA POWER daily and monthly point APIs | NASA POWER (MERRA-2 reanalysis; SMAP L4 high-resolution aliases for the soil-health moisture series) | Yes | Climate, rainfall, temperature, long-record soil wetness, and a separate 2015-present SMAP surface/root-zone moisture series | Public REST API, no key. MERRA-2 meteorology is about 50 km; SMAP L4 is natively about 9 km and is served on an approximately 0.09° grid. |
 | NASA GIBS (SMAP L4, GPM IMERG, MODIS) | NASA EOSDIS | Yes | Soil-moisture and rain imagery; MODIS true colour on the map | Public WMTS tiles. Imagery only, not point values. |
 | Sentinel-2 L2A (`sentinel-2-c1-l2a`) | Copernicus / ESA | No | NDVI, vegetation, bare-field detection | Public COG files on AWS. "Contains modified Copernicus Sentinel data." |
 | Earth Search STAC | Element 84 | No | Sentinel-2 scene discovery | `earth-search.aws.element84.com/v1`, public best-effort service. |
-| SoilGrids 2.0 | ISRIC – World Soil Information | No | Soil properties by depth | `rest.isric.org`, CC BY 4.0, 250 m predictions, slow and rate limited. |
+| SoilGrids 2.0 | ISRIC – World Soil Information | No | Soil properties by depth | `maps.isric.org` WCS is preferred for spatial subsets; the paused beta REST API is retained as a short-budget secondary attempt. CC BY 4.0, 250 m predictions. |
 | Fields of the World / PRUE | Source Cooperative | No | Predicted field boundaries on the map | PMTiles, CC BY 4.0. Model-derived outlines. |
 | OpenStreetMap | OSM contributors | No | Street basemap | Public tiles with their own usage policy. |
 | Esri World Imagery | Esri | No | Satellite basemap | External tiles; follow Esri's terms. |
 | Open-Meteo Geocoding | Open-Meteo (GeoNames-based) | No | Place search | Public endpoint behind `/api/geocode`. |
 | Crop requirement database | Agrimetry (FAO-style generalised values) | No | Rotation, replay, passport | `lib/rotation/crops.js`; approximate, not calibrated locally. |
 
-SMAP and IMERG *point values* need a NASA Earthdata login, which is not configured, so they appear as map imagery only; soil wetness numbers come from NASA POWER (MERRA-2), not from SMAP retrievals.
+**Keep the NASA pathways distinct.** The Water Stress page continues to calculate its long-record soil-wetness indicators from NASA POWER MERRA-2 (`GWETTOP` / `GWETROOT`), while the Soil Health page separately requests daily SMAP L4 volumetric surface and root-zone moisture through NASA POWER high-resolution parameter aliases (`SFMC`, `RZMC`, and optional profile / percentile fields). The SMAP request uses the public POWER API and does not require an Earthdata login. NASA GIBS SMAP and GPM IMERG map layers remain visual context only; they do not feed the current Water Stress score. SMAP data starts in 2015, has a native grid of about 9 km, and is not a field-level probe reading.
 
 Documentation: [NASA POWER API](https://power.larc.nasa.gov/docs/services/api/) · [NASA GIBS](https://www.earthdata.nasa.gov/data/tools/gibs) · [Earth Search](https://earth-search.aws.element84.com/v1) · [SoilGrids](https://www.isric.org/explore/soilgrids) · [FAO-56](https://www.fao.org/4/x0490e/x0490e00.htm) · [GeoTIFF.js](https://geotiffjs.github.io/) · [Proj4js](https://proj4js.org/) · [PNGjs](https://github.com/pngjs/pngjs)
 
@@ -253,7 +254,7 @@ All routes are server-side Next.js route handlers. Latitude/longitude are valida
 | `POST /api/vegetation` | Sentinel-2 NDVI analysis for a polygon (below) |
 | `GET /api/water-stress?lat&lon&months=3-12` | Monthly stress ratings, rainfall vs normal, ET0, water balance, 3-month rainfall index, aridity class, soil wetness, declining periods, dry spells |
 | `POST /api/bare-field` | Same body as vegetation; bare periods, crop cycles, cover-crop windows, erosion exposure (a 12-month run can take a couple of minutes) |
-| `POST /api/soil-health` | `{ field, mode: "topsoil" \| "deep" \| "intervals", samplePoint }`; staged SoilGrids lookup. 404 if no estimate nearby, 504 if too slow |
+| `POST /api/soil-health` | `{ field, mode: "topsoil" \| "deep" \| "intervals", samplePoint }`; independent SoilGrids and NASA SMAP requests for topsoil. Valid geometry returns `ready`, `partial` or `degraded` status and warnings instead of failing when either public service is unavailable. `deep` and `intervals` are optional SoilGrids-only requests. |
 | `GET /api/climate-normals?lat&lon` | NASA POWER monthly `T2M` and `PRECTOTCORR` since 2001 for the rotation engine |
 | `GET /api/climate-history?lat&lon` | Year-by-year monthly `T2M`, `PRECTOTCORR`, `GWETROOT` plus compact daily `T2M_MAX` and `PRECTOTCORR` for the replay |
 
@@ -294,7 +295,7 @@ lib/                          analysis code, pure functions where possible so it
   water-stress/  NASA POWER water-stress analysis
   climate/       ET0, aridity and the standardized rainfall index
   bare-field/    bare-period, crop-cycle and erosion detection
-  soil-health/   SoilGrids client and soil interpretation
+  soil-health/   ISRIC WCS/REST SoilGrids client, NASA POWER SMAP client, soil interpretation
   rotation/      crop database and the multi-criteria rotation engine
   replay/        historical season replay, extremes and scenarios
   passport/      Evidence Passport builder and exports
@@ -320,7 +321,7 @@ Clearing site data removes them. Nothing is sent to a server except the field ge
 - **Scripts:** `npm run dev`, `npm run build`, `npm start`, `npm run lint`.
 - **Build needs the network:** the app loads Google Fonts through `next/font`, so `npm run build` fails in an offline environment.
 - **Lint status:** the code is clean apart from a known `react-hooks/set-state-in-effect` warning on the pattern used to load saved fields from `localStorage` on mount.
-- **Tests:** there is no automated test suite yet. The analysis libraries are pure functions and were checked by hand against live NASA POWER, Sentinel-2 and SoilGrids responses and known cases (for example the FAO-56 radiation example and the 2002 Rajasthan drought). Adding unit tests for `lib/` is a roadmap item.
+- **Tests:** there is no automated test suite yet. The analysis libraries are mostly pure functions; add unit tests for soil-property conversion, partial-source responses, crop scoring with missing soil inputs and known climate-analysis cases. Live upstream availability should be checked separately because public data services can change or be temporarily unavailable.
 - **Adding or tuning a crop:** edit `lib/rotation/crops.js` (growing months, temperature range, water use, pH, texture, nitrogen, equipment). Criterion weights are in `buildWeights` in `lib/rotation/engine.js`.
 - **Credentials:** none are used. If a future provider needs a key, keep it in a server-side environment variable and never expose it to client code. Public access does not remove provider terms: keep the Copernicus, NASA, OpenStreetMap, Esri, ISRIC and Fields of the World attributions and review each provider's terms before public deployment.
 - **Public services:** Earth Search, SoilGrids and the map tile providers are best-effort and can be slow or unavailable; the app surfaces those failures instead of hiding them.
@@ -354,7 +355,7 @@ These are presentation improvements only; they do not change the underlying scie
 - **NDVI** shows greenness, not yield, crop type, disease, soil fertility or soil moisture. Low NDVI can mean bare soil, fallow, water, buildings, a harvested or newly sown crop, or stress.
 - **One clear Sentinel-2 image per month** represents each month; short events can be missed, and months without a usable image stay blank. Sentinel-2 coverage here spans about 56°S to 84°N; farms crossing the equator, a UTM or Sentinel-2 tile boundary, or larger than 100 km must be split.
 - **Climate, rainfall and soil wetness** are NASA POWER grid-cell estimates about 50 km wide, not measurements at the field. ET0 is a temperature-based Hargreaves–Samani estimate.
-- **SoilGrids** is a 250 m machine-learning prediction with wide uncertainty for some properties (organic carbon especially), and can be slow or unavailable.
+- **SoilGrids** is a 250 m machine-learning prediction with property-specific uncertainty (organic carbon can be especially uncertain). ISRIC currently reports its beta REST API as paused; Agrimetry therefore tries the documented WCS map service first and keeps the REST API as a secondary attempt. If neither path returns data, NASA SMAP still supplies separate landscape-scale moisture context and farmer-entered laboratory values remain usable. SMAP is not a substitute for mapped pH, texture, organic-carbon concentration or bulk density.
 - **Crop values are generalised** FAO-style approximations (growing length, temperature, water, pH, texture, nitrogen). Scores rank options; they are **not** yield or profit forecasts and have not been validated locally.
 - **Not modelled:** intercropping, perennials, tillage, fertiliser practice, price data, frost and flood risk, soil nutrients and salinity, snow cover and winterkill detail.
 - **Replay and scenarios** use monthly weather plus daily heat and dry-spell counts, so events inside a month are only partly captured. Scenarios shift every month by the same amount; they are sensitivity tests, not climate projections.
@@ -368,7 +369,7 @@ These are presentation improvements only; they do not change the underlying scie
 The seven planned features are in place. Next, roughly in order of value:
 
 1. **Local validation:** district crop calendars and agronomic advice, so the Evidence Passport can cite regional sources and raise confidence beyond Medium.
-2. **SMAP and IMERG point time series** (needs NASA Earthdata credentials) to complement the MERRA-2 soil-wetness analysis.
+2. **IMERG numerical rainfall history** to complement the existing MERRA-2 water-stress analysis; NASA SMAP numerical surface and root-zone moisture is already available separately on the Soil Health page through NASA POWER.
 3. **Landsat observations** to improve bare-field timing between Sentinel-2 passes.
 4. **Soil health:** nutrients (N, P, K), salinity and cation-exchange capacity from farmer tests.
 5. **Rotation engine:** more crops and regions, fuller cold-climate modelling (snow cover, winterkill), local variety calendars and price data.
@@ -378,3 +379,4 @@ The seven planned features are in place. Next, roughly in order of value:
 ---
 
 *Data: NASA POWER (NASA Langley Research Center POWER Project), NASA GIBS, Copernicus Sentinel-2 (ESA), ISRIC SoilGrids, Fields of the World, OpenStreetMap contributors and Esri. See [section 5](#5-data-sources-and-attribution). No licence file has been added to this repository yet.*
+

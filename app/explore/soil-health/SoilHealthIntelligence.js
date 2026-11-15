@@ -61,6 +61,36 @@ function TextureProfile({ layers }) {
   );
 }
 
+function SoilMoistureStory({ data }) {
+  if (!data?.available || !data.summary?.latest) return null;
+  const latest = data.summary.latest;
+  const trendLabel = (direction) => ({ declining: "Moving down", rising: "Moving up", steady: "Fairly steady", insufficient: "Not enough observations" }[direction] || "Not available");
+  const dateLabel = (value) => value && /^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : "Latest available";
+  return (
+    <section className="vi-story-panel sh-smap-panel" aria-labelledby="sh-smap-title">
+      <div className="vi-story-intro">
+        <span className="vi-story-leaf"><Icon name="layers" size={21}/></span>
+        <div>
+          <span className="vi-overline">THE WATER MEMORY OF THIS LAND · {data.kind === "smap" ? "NASA SMAP" : "NASA POWER HYDROLOGY"}</span>
+          <h2 id="sh-smap-title">What has been happening beneath the surface?</h2>
+          <p>{data.kind === "smap" ? "SMAP follows water in the surface and root zone over time. Its roughly 9 km grid represents the surrounding landscape rather than this individual field." : "When the higher-resolution SMAP series is unavailable, NASA POWER can still provide broader MERRA-2 wetness context. This roughly 50 km model grid is coarser and is not a direct SMAP measurement."}</p>
+        </div>
+      </div>
+      <div className="sh-smap-metrics">
+        <article><span>{data.kind === "smap" ? "SURFACE MOISTURE · 0–5 CM" : "SURFACE WETNESS FRACTION"}</span><strong>{Number.isFinite(latest.surface) ? (data.kind === "smap" ? `${latest.surface.toFixed(3)} m³/m³` : `${(latest.surface * 100).toFixed(0)}%`) : "—"}</strong><small>{data.kind === "smap" ? "Recent surface water content" : "Modelled fraction of surface-layer wetness"}</small></article>
+        <article><span>{data.kind === "smap" ? "ROOT-ZONE MOISTURE · 0–100 CM" : "ROOT-ZONE WETNESS FRACTION"}</span><strong>{Number.isFinite(latest.rootZone) ? (data.kind === "smap" ? `${latest.rootZone.toFixed(3)} m³/m³` : `${(latest.rootZone * 100).toFixed(0)}%`) : "—"}</strong><small>{data.kind === "smap" ? "Recent modelled root-zone water content" : "Modelled fraction of root-zone wetness"}</small></article>
+        <article><span>{data.kind === "smap" ? "ROOT-ZONE PERCENTILE" : "DATA SOURCE"}</span><strong>{data.kind === "smap" && Number.isFinite(latest.rootPercentile) ? `${latest.rootPercentile.toFixed(0)}th` : data.kind === "smap" ? "—" : "MERRA-2"}</strong><small>{data.kind === "smap" ? "Relative to this location's SMAP record since 2015" : "Broader model-based context, not SMAP"}</small></article>
+      </div>
+      <div className="sh-smap-story-grid">
+        <article><span>THE DEEPER STORY</span><strong>{data.story?.headline || "Recent water conditions"}</strong><p>{data.story?.observations?.join(" ") || "Recent SMAP readings add context to the water held in the wider landscape."}</p></article>
+        <article><span>HOW THE LAST 90 DAYS MOVED</span><strong>Root zone: {trendLabel(data.summary.rootTrend?.direction)}</strong><p>Surface layer: {trendLabel(data.summary.surfaceTrend?.direction)}. These trends describe the available sequence of readings, not a forecast or a diagnosis of crop stress.</p></article>
+      </div>
+      <div className="vi-story-next"><span className="vi-overline">WHAT TO CHECK NEXT</span><p>{data.story?.nextStep || "Compare these readings with rainfall, crop stage and what is visible in the field."}</p></div>
+      <small className="vi-method-note">{data.source?.name || "NASA POWER soil-water context"} · native resolution about {Math.round((data.source?.nativeResolutionMetres || 9000) / 1000)} km · {data.summary.observationCount || 0} valid daily observations · through {dateLabel(data.source?.endDate || latest.date)}. {data.source?.note || ""}</small>
+    </section>
+  );
+}
+
 export default function SoilHealthIntelligence() {
   const [fields, setFields] = useState([]);
   const [selectedFieldId, setSelectedFieldId] = useState("");
@@ -111,7 +141,8 @@ export default function SoilHealthIntelligence() {
   const layers = result?.layers || null;
   const profile = useMemo(() => buildSoilProfile(layers, test), [layers, test]);
   const hasFarmerValues = profile.farmerValuesUsed.length > 0;
-  const showProfile = Boolean(layers) || hasFarmerValues;
+  const showProfile = Boolean(result) || hasFarmerValues;
+  const resultInfo = result || { status: "local", source: null, sample: null, warnings: [], caveats: [] };
 
   async function runAnalysis(event) {
     event?.preventDefault();
@@ -123,10 +154,9 @@ export default function SoilHealthIntelligence() {
       const response = await fetch("/api/soil-health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ field: selectedField }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `Soil lookup failed (HTTP ${response.status}).`);
-      if (!payload?.layers) throw new Error("SoilGrids returned an incomplete report. Please try again.");
       setResult(payload);
     } catch (requestError) {
-      setError(requestError.message || "Unable to retrieve SoilGrids information.");
+      setError(requestError.message || "Unable to retrieve soil information.");
     } finally {
       setLoading(false);
     }
@@ -140,12 +170,17 @@ export default function SoilHealthIntelligence() {
       const response = await fetch("/api/soil-health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ field: selectedField, mode: kind, samplePoint: result.sample }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "That request could not be completed (HTTP " + response.status + ").");
+      if (!payload.layers) throw new Error(payload.error || payload.soilGrids?.error || "ISRIC did not return the requested extra soil layers. Your existing soil and water analysis is unchanged.");
+      if (payload.soilGrids?.error) setDeepError(payload.soilGrids.error);
       setResult((current) => {
         if (!current) return current;
         const merged = {};
-        for (const key of Object.keys(current.layers)) {
-          merged[key] = { ...current.layers[key] };
-          for (const [label, entry] of Object.entries(payload.layers?.[key] || {})) merged[key][label] = { ...(merged[key][label] || {}), ...Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== null)) };
+        const keys = new Set([...Object.keys(current.layers || {}), ...Object.keys(payload.layers || {})]);
+        for (const key of keys) {
+          merged[key] = { ...(current.layers?.[key] || {}) };
+          for (const [label, entry] of Object.entries(payload.layers?.[key] || {})) {
+            merged[key][label] = { ...(merged[key][label] || {}), ...Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== null)) };
+          }
         }
         return { ...current, layers: merged };
       });
@@ -190,7 +225,7 @@ export default function SoilHealthIntelligence() {
           <span className="vi-divider"/>
           <div className="vi-header-title"><small>FIELD INTELLIGENCE</small><strong>Soil health</strong></div>
         </div>
-        <div className="vi-header-actions"><span className="vi-source-pill"><i/> ISRIC SOILGRIDS · YOUR SOIL TEST</span><Link href="/explore/vegetation" className="vi-explore-link">Vegetation</Link><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore/rotation" className="vi-explore-link">Rotation</Link></div>
+        <div className="vi-header-actions"><span className="vi-source-pill"><i/> SOILGRIDS · NASA SMAP · YOUR SOIL TEST</span><Link href="/explore/vegetation" className="vi-explore-link">Vegetation</Link><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore/rotation" className="vi-explore-link">Rotation</Link></div>
       </header>
 
       <div className="vi-content">
@@ -198,9 +233,9 @@ export default function SoilHealthIntelligence() {
           <div>
             <span className="vi-kicker"><span/> SOIL HEALTH INTELLIGENCE</span>
             <h1>Know the soil under your <em>next crop</em>.</h1>
-            <p>Agrimetry looks up modelled soil properties for your field from ISRIC SoilGrids (organic carbon, pH, sand, silt, clay and bulk density down to 2 m), lets you add your own soil-test results, and explains what the soil means for crops and rotations, with the depth, resolution and uncertainty always shown.</p>
+            <p>Agrimetry combines mapped soil properties when available, NASA soil-water history and your own laboratory results. It explains what the soil foundation and changing water conditions may mean for crops, while keeping each source, depth and resolution visible.</p>
           </div>
-          <div className="vi-intro-note"><Icon name="layers" size={20}/><span>ISRIC SoilGrids 2.0 · 250 m · 6 depths<br/><strong>No account or API key needed</strong></span></div>
+          <div className="vi-intro-note"><Icon name="layers" size={20}/><span>ISRIC WCS · NASA SMAP · farmer tests<br/><strong>Independent fallback data sources</strong></span></div>
         </section>
 
         {fields.length === 0 ? (
@@ -218,7 +253,7 @@ export default function SoilHealthIntelligence() {
                 </select>
               </label>
               <div className="vi-selected-summary"><span className="vi-summary-icon"><Icon name="map" size={17}/></span><div><strong>{selectedName}</strong><small>{selectedArea}</small></div></div>
-              <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField}><Icon name={loading ? "refresh" : "layers"} size={17}/>{loading ? "Asking SoilGrids…" : "Get soil profile"}</button>
+              <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField}><Icon name={loading ? "refresh" : "layers"} size={17}/>{loading ? "Reading soil and water data…" : "Read this field"}</button>
               {error && <div className="vi-error" role="alert"><Icon name="info" size={17}/><span>{error}</span></div>}
 
               <div className="vi-panel-divider"/>
@@ -238,27 +273,29 @@ export default function SoilHealthIntelligence() {
             </aside>
 
             <section className="vi-results-area">
-              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS READING THE SOIL MAP</span><h2>Asking ISRIC SoilGrids for your field</h2></div><time>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</time></div><p className="vi-progress-detail">SoilGrids is a free research service and can take from a few seconds to about a minute. If your field sits on a cell with no estimate, Agrimetry tries nearby points.</p><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
+              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS READING THE LAND</span><h2>Checking soil maps and NASA water history</h2></div><time>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</time></div><p className="vi-progress-detail">SoilGrids map access and NASA SMAP are requested independently. If one service is unavailable, the other can still provide useful context, and you can always add your own soil-test values.</p><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
 
               {!showProfile ? (
-                !loading && <div className="vi-wait-panel"><span className="vi-wait-mark"><Icon name="layers" size={22}/></span><div><strong>Your Soil Intelligence Profile will appear here.</strong><p>Get the SoilGrids profile for your field, or just type in your own soil-test results on the left.</p></div></div>
+                !loading && <div className="vi-wait-panel"><span className="vi-wait-mark"><Icon name="layers" size={22}/></span><div><strong>Your Soil Intelligence Profile will appear here.</strong><p>Run an analysis to combine mapped soil information and NASA soil-water history, or add your own laboratory soil-test results on the left.</p></div></div>
               ) : (
                 <>
-                  <div className="vi-result-heading"><div><span className="vi-overline">03 / SOIL INTELLIGENCE PROFILE</span><h2>{selectedName}</h2><p>{layers ? `SoilGrids 2.0 (250 m)${result.sample?.where === "nearby" ? " · sampled just outside the field" : ""}` : "From your own soil test"}{hasFarmerValues ? " · with your soil-test values" : ""}</p></div><span className="vi-live-badge"><i/> {layers ? "PROFILE READY" : "YOUR TEST ONLY"}</span></div>
+                  <div className="vi-result-heading"><div><span className="vi-overline">03 / SOIL & WATER INTELLIGENCE</span><h2>{selectedName}</h2><p>{layers ? `SoilGrids 2.0 via ${resultInfo.source?.accessMethod || "ISRIC map service"} (250 m)${resultInfo.sample?.where === "nearby" ? " · sampled just outside the field" : ""}` : hasFarmerValues ? "Using your own soil-test results" : "Soil map unavailable; checking independent NASA water data"}{hasFarmerValues ? " · your test values take priority" : ""}</p></div><span className="vi-live-badge"><i/> {resultInfo.status === "ready" ? "SOURCES READY" : resultInfo.status === "partial" ? "PARTIAL DATA READY" : resultInfo.status === "local" ? "LOCAL TEST DATA" : "LIMITED DATA"}</span></div>
 
-                  {layers && (!layers["30-60cm"] || !Number.isFinite(layers.soc?.["0-5cm"]?.low)) && (
-                    <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>Loaded quickly: topsoil averages only (SoilGrids answers slowly). {!layers["30-60cm"] && <button type="button" className="sh-link-button" onClick={() => loadMore("deep")} disabled={Boolean(deepLoading)}>{deepLoading === "deep" ? "Loading deeper layers…" : "Load deeper layers (30–200 cm)"}</button>} {!Number.isFinite(layers.soc?.["0-5cm"]?.low) && <button type="button" className="sh-link-button" onClick={() => loadMore("intervals")} disabled={Boolean(deepLoading)}>{deepLoading === "intervals" ? "Loading uncertainty ranges (up to a minute)…" : "Load uncertainty ranges (top 30 cm)"}</button>}{deepError ? " " + deepError : ""}</span></div>
+                  {layers && (!layers.soc?.["30-60cm"] || !Number.isFinite(layers.soc?.["0-5cm"]?.low)) && (
+                    <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>Some optional deeper layers or prediction intervals are not loaded yet. {!layers.soc?.["30-60cm"] && <button type="button" className="sh-link-button" onClick={() => loadMore("deep")} disabled={Boolean(deepLoading)}>{deepLoading === "deep" ? "Loading deeper layers…" : "Load deeper layers (30–200 cm)"}</button>} {!Number.isFinite(layers.soc?.["0-5cm"]?.low) && <button type="button" className="sh-link-button" onClick={() => loadMore("intervals")} disabled={Boolean(deepLoading)}>{deepLoading === "intervals" ? "Loading uncertainty ranges (up to a minute)…" : "Load uncertainty ranges (top 30 cm)"}</button>}{deepError ? " " + deepError : ""}</span></div>
                   )}
-                  {result?.sample?.where === "nearby" && <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>SoilGrids had no estimate inside your field, so these values come from a point about 300 m away. Treat them as a rough guide.</span></div>}
+                  {result?.sample?.where === "nearby" && <div className="vi-error sh-notice" role="status"><Icon name="info" size={17}/><span>The mapped estimate comes from a nearby point outside the field. Treat it as regional context, not a field measurement.</span></div>}
 
-                  <div className="vi-metrics-grid">
+                  {resultInfo.warnings?.map((warning) => <div className="sh-service-notice" role="status" key={warning}><span className="sh-service-notice-icon"><Icon name="info" size={17}/></span><div><strong>{warning.includes("showing the coarser MERRA-2") ? "Using a broader NASA water dataset" : "Some data is temporarily unavailable"}</strong><p>{warning}</p></div></div>)}
+
+                  {(layers || hasFarmerValues) && <div className="vi-metrics-grid">
                     <article className="vi-metric-card"><span>TEXTURE (TOPSOIL)</span><strong className="sh-metric-text">{profile.texture || "—"}</strong><small>{Number.isFinite(sand) ? `${sand.toFixed(0)}% sand · ${silt.toFixed(0)}% silt · ${clay.toFixed(0)}% clay` : "Needs sand, silt and clay."}</small></article>
-                    <article className="vi-metric-card"><span>ORGANIC CARBON</span><strong>{profile.ratings.soc ? profile.ratings.soc.label : "—"}</strong><small>{profile.ratings.soc ? `${profile.ratings.soc.detail} (${profile.origin.soc === "farmer" ? "your test" : "SoilGrids"}).` : "No value available."}</small></article>
-                    <article className="vi-metric-card"><span>SOIL pH</span><strong>{Number.isFinite(profile.effective.phh2o) ? profile.effective.phh2o.toFixed(1) : "—"}</strong><small>{profile.ratings.ph ? `${profile.ratings.ph.label}. ${profile.origin.phh2o === "farmer" ? "Your test." : "SoilGrids."}` : "No value available."}</small></article>
-                    <article className="vi-metric-card"><span>BULK DENSITY</span><strong>{Number.isFinite(profile.effective.bdod) ? profile.effective.bdod.toFixed(2) : "—"}</strong><small>{profile.ratings.bulkDensity ? `${profile.ratings.bulkDensity.label} (kg/dm³). ${profile.origin.bdod === "farmer" ? "Your test." : "SoilGrids."}` : "No value available."}</small></article>
-                  </div>
+                    <article className="vi-metric-card"><span>ORGANIC CARBON</span><strong>{profile.ratings.soc ? profile.ratings.soc.label : "—"}</strong><small>{profile.ratings.soc ? `${profile.ratings.soc.detail} (${profile.origin.soc === "farmer" ? "your test" : "mapped estimate"}).` : "No value available."}</small></article>
+                    <article className="vi-metric-card"><span>SOIL pH</span><strong>{Number.isFinite(profile.effective.phh2o) ? profile.effective.phh2o.toFixed(1) : "—"}</strong><small>{profile.ratings.ph ? `${profile.ratings.ph.label}. ${profile.origin.phh2o === "farmer" ? "Your test." : "mapped estimate."}` : "No value available."}</small></article>
+                    <article className="vi-metric-card"><span>BULK DENSITY</span><strong>{Number.isFinite(profile.effective.bdod) ? profile.effective.bdod.toFixed(2) : "—"}</strong><small>{profile.ratings.bulkDensity ? `${profile.ratings.bulkDensity.label} (kg/dm³). ${profile.origin.bdod === "farmer" ? "Your test." : "mapped estimate."}` : "No value available."}</small></article>
+                  </div>}
 
-                  <section className="vi-story-panel sh-land-story" aria-labelledby="sh-land-story-title">
+                  {(layers || hasFarmerValues) && <section className="vi-story-panel sh-land-story" aria-labelledby="sh-land-story-title">
                     <div className="vi-story-intro">
                       <span className="vi-story-leaf"><Icon name="leaf" size={21}/></span>
                       <div>
@@ -274,9 +311,13 @@ export default function SoilHealthIntelligence() {
                       <article className="vi-story-cell"><span>WHAT MAY NEED ATTENTION</span><strong>{profile.limitations?.length ? `${profile.limitations.length} point${profile.limitations.length === 1 ? "" : "s"} to review` : "No flagged limitation"}</strong><p>{profile.limitations?.length ? "The evidence panel below explains each flagged property, why it may matter and what to consider when comparing rotations. These are prompts for investigation, not proof of a field problem." : "The available indicators have not flagged a major limitation. This does not rule out nutrient deficiencies, salinity or local variation that these datasets do not measure."}</p></article>
                     </div>
                     <div className="vi-story-next"><span className="vi-overline">A PRACTICAL NEXT STEP</span><p>Use this profile alongside a recent laboratory soil test and what you observe in the field. Compare texture, organic carbon and pH with the needs of the crops you are considering; investigate any flagged limitation with a local agronomist before changing the rotation.</p></div>
-                  </section>
+                  </section>}
 
-                  <section className="vi-white-panel">
+                  {!layers && !hasFarmerValues && <section className="vi-white-panel sh-no-soil-map"><span className="vi-overline">SOIL FOUNDATION NOT AVAILABLE RIGHT NOW</span><h2>The water story can still be read.</h2><p>ISRIC SoilGrids did not return a usable soil profile for this request. Agrimetry has not substituted NASA moisture data for pH, texture or organic carbon. Enter a recent laboratory soil test to complete the soil foundation while the mapped service recovers.</p></section>}
+
+                  {resultInfo.soilMoisture?.available && <SoilMoistureStory data={resultInfo.soilMoisture}/>}
+
+                  {(layers || hasFarmerValues) && <section className="vi-white-panel">
                     <div className="vi-panel-title"><div><span className="vi-overline">04 / POSSIBLE LIMITATIONS</span><h2>{profile.limitations.some((l) => l.severity !== "info") ? "What may hold the soil back" : "No major limitation flagged"}</h2><p>Plain-language reading of the values above, and what each means for crop choice and rotation planning.</p></div></div>
                     {profile.limitations.length ? (
                       <div className="sh-limits">
@@ -289,8 +330,8 @@ export default function SoilHealthIntelligence() {
                           </article>
                         ))}
                       </div>
-                    ) : <p className="bf-empty">Based on the available values, organic carbon, pH and bulk density are within generally comfortable ranges and texture is not extreme. Soil tests can still reveal nutrient or salinity issues that these layers do not cover.</p>}
-                  </section>
+                    ) : <p className="bf-empty">No major limitation is flagged by the available values. This does not rule out nutrient deficiencies, salinity or local variation that these inputs do not measure.</p>}
+                  </section>}
 
                   {layers && (
                     <>
@@ -298,12 +339,12 @@ export default function SoilHealthIntelligence() {
                         <section className="vi-white-panel"><div className="vi-panel-title"><div><span className="vi-overline">05 / TEXTURE BY DEPTH</span><h2>How sandy or clayey, down to 2 m</h2><p>Sand / silt / clay (%) for each SoilGrids layer.</p></div></div><TextureProfile layers={layers}/></section>
                         <section className="vi-white-panel sh-meta-panel"><span className="vi-overline">06 / HOW MUCH TO TRUST IT</span><h2>Resolution and uncertainty</h2>
                           <ul className="sh-meta-list">
-                            <li><strong>Resolution:</strong> one prediction per {result.source.resolutionMetres} m cell (about {Math.round((result.source.resolutionMetres ** 2) / 100) / 100} ha).</li>
+                            <li><strong>Resolution:</strong> one prediction per {(resultInfo.source?.resolutionMetres || 250)} m cell (about {Math.round(((resultInfo.source?.resolutionMetres || 250) ** 2) / 100) / 100} ha).</li>
                             <li><strong>Depths:</strong> {DEPTHS.map((d) => depthText(d.label)).join(", ")}.</li>
-                            <li><strong>Uncertainty:</strong> every value is shown with a 90% prediction interval; wide intervals mean low confidence.</li>
-                            <li><strong>Sample point:</strong> {result.sample ? `${result.sample.latitude.toFixed(4)}, ${result.sample.longitude.toFixed(4)} (${result.sample.where === "nearby" ? "just outside the field" : "inside the field"})` : "—"}.</li>
+                            <li><strong>Uncertainty:</strong> 90% prediction intervals are shown when the map service returns them. A missing interval means its uncertainty range was not available, not that the value is certain.</li>
+                            <li><strong>Sample point:</strong> {resultInfo.sample ? `${resultInfo.sample.latitude.toFixed(4)}, ${resultInfo.sample.longitude.toFixed(4)} (${resultInfo.sample.where === "nearby" ? "just outside the field" : "inside the field"})` : "—"}.</li>
                           </ul>
-                          <small className="vi-method-note">{result.source.note} Licence: {result.source.license}.</small>
+                          <small className="vi-method-note">{resultInfo.source?.note || "Values are not currently available from the mapped service."} {resultInfo.source?.license ? `Licence: ${resultInfo.source.license}.` : ""}</small>
                         </section>
                       </div>
 
@@ -314,8 +355,8 @@ export default function SoilHealthIntelligence() {
                     </>
                   )}
 
-                  <section className="vi-caveats"><div><span className="vi-overline">READ THE DATA RESPONSIBLY</span><h3>What this can—and cannot—tell you.</h3></div><ul>{[...(result?.caveats || ["Soil-test results describe a sample, not the whole field; sampling depth and method matter.", "Interpretations are general guidance. Crop response depends on climate, management and local conditions."]), "Crop-by-crop suitability scoring is planned in the Crop Rotation Intelligence Engine; this profile feeds that engine."].map((item) => <li key={item}>{item}</li>)}</ul></section>
-                  <div className="vi-source-footer"><span>DATA: ISRIC SOILGRIDS 2.0 · FARMER SOIL TEST</span><span>Poggio et al. (2021), SOIL 7, 217–240</span><a href="https://www.isric.org/explore/soilgrids" target="_blank" rel="noreferrer">ISRIC SoilGrids <Icon name="external" size={12}/></a></div>
+                  <section className="vi-caveats"><div><span className="vi-overline">READ THE DATA RESPONSIBLY</span><h3>What this can—and cannot—tell you.</h3></div><ul>{[...(resultInfo.caveats || ["Soil-test results describe a sample, not the whole field; sampling depth and method matter.", "Interpretations are general guidance. Crop response depends on climate, management and local conditions."]), "Crop-by-crop suitability scoring is provided by the Crop Rotation Intelligence Engine; this profile feeds that engine."].map((item) => <li key={item}>{item}</li>)}</ul></section>
+                  <div className="vi-source-footer"><span>DATA: ISRIC SOILGRIDS · NASA SMAP / POWER · FARMER SOIL TEST</span><span>SoilGrids: CC BY 4.0 · SMAP: NASA / NSIDC</span><a href="https://docs.isric.org/globaldata/soilgrids/" target="_blank" rel="noreferrer">ISRIC data access <Icon name="external" size={12}/></a><a href="https://power.larc.nasa.gov/docs/methodology/data/sources_hydrology/" target="_blank" rel="noreferrer">NASA SMAP methodology <Icon name="external" size={12}/></a></div>
                 </>
               )}
             </section>

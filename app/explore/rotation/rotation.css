@@ -40,3 +40,11 @@
 .ro-list.missing h3 { color: #7a6a2f; }
 .ro-weights { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ro-weights span { padding: 2px 8px; border-radius: 99px; background: #eef2e8; font-size: 10px; color: #4d5c45; }
+
+
+/* Compact service-status note: informative without dominating the analysis story. */
+.sh-service-notice { display: flex; align-items: flex-start; gap: 11px; margin: 12px 0 16px; padding: 12px 15px; border: 1px solid #d9e4d3; border-left: 3px solid #7c9a68; border-radius: 11px; background: rgba(245, 248, 239, .92); color: #405541; }
+.sh-service-notice-icon { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px; background: #e6eedf; color: #52734c; }
+.sh-service-notice strong { display: block; margin: 1px 0 3px; color: #34513a; font-size: 12px; font-weight: 750; letter-spacing: .01em; }
+.sh-service-notice p { margin: 0; color: #687763; font-size: 12px; line-height: 1.55; }
+@media (max-width: 640px) { .sh-service-notice { padding: 10px 11px; gap: 8px; } .sh-service-notice p { font-size: 11px; } }

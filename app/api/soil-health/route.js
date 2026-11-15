@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import { validateFarmGeometry } from "@/lib/vegetation/earth-search";
-import { fetchSoilGrids } from "@/lib/soil-health/soilgrids";
+import { chooseSamplePoints, fetchSoilGrids } from "@/lib/soil-health/soilgrids";
+import { fetchNasaSmapSoilMoisture } from "@/lib/soil-health/nasa-smap";
 import { buildSoilProfile, DEPTHS, SOIL_PROPERTIES } from "@/lib/soil-health/interpret";
 
 export const maxDuration = 60;
 
-const SOURCE = {
-  name: "ISRIC SoilGrids 2.0",
-  endpoint: "rest.isric.org/soilgrids/v2.0",
-  resolutionMetres: 250,
-  note: "Machine-learning predictions on a global 250 m grid, not measurements from your field. Values are the mean prediction; the range is the 90% prediction interval (5th to 95th percentile).",
-  license: "CC BY 4.0, ISRIC – World Soil Information",
-};
+const BASE_CAVEATS = [
+  "SoilGrids predictions describe a 250 m model cell, not a laboratory sample from your exact field. Small fields and mixed landscapes can differ from the mapped cell.",
+  "SoilGrids uncertainty ranges are prediction intervals, not measurement error bars. Wider ranges mean the model is less certain.",
+  "Bulk density represents the mapped fine-earth fraction and does not detect recent machinery compaction in your field.",
+  "NASA soil-water products describe gridded landscape conditions, not a precise field irrigation reading. SMAP L4 is about 9 km native resolution; standard MERRA-2 wetness context is coarser.",
+  "Satellite/model soil-water context does not replace soil pH, texture, organic-carbon concentration, nutrient tests or bulk density.",
+  "Interpretations are prompts for investigation. Crop response depends on crop stage, local management, climate and field conditions.",
+];
+
+function safeMessage(error) {
+  return String(error?.message || "The upstream soil-data service is temporarily unavailable.").slice(0, 260);
+}
 
 export async function POST(request) {
   if (Number(request.headers.get("content-length") || 0) > 1_500_000) {
@@ -21,45 +27,77 @@ export async function POST(request) {
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Send a valid JSON request containing the selected farm boundary." }, { status: 400 });
   }
+
   let geometry;
   try { geometry = validateFarmGeometry(body?.field?.geometry || body?.geometry); } catch (validationError) {
     return NextResponse.json({ error: validationError.message || "Invalid farm boundary." }, { status: 400 });
   }
-  const mode = ["deep", "intervals"].includes(body?.mode) ? body.mode : "topsoil";
 
-  try {
-    const { layers, sample, attempts } = await fetchSoilGrids(geometry, { mode, samplePoint: body?.samplePoint });
-    if (!layers) {
-      const timedOut = attempts.some((a) => a.error === "timed out");
+  const mode = ["deep", "intervals"].includes(body?.mode) ? body.mode : "topsoil";
+  if (mode !== "topsoil") {
+    try {
+      const soil = await fetchSoilGrids(geometry, { mode, samplePoint: body?.samplePoint });
       return NextResponse.json({
-        error: timedOut
-          ? "SoilGrids was too slow to respond. It is a free research service and is sometimes overloaded; please try again in a minute."
-          : "SoilGrids has no soil estimate at this location or just around it. This happens in built-up areas, water bodies and a few masked cells. You can still enter your own soil-test results.",
-        code: timedOut ? "SOILGRIDS_TIMEOUT" : "NO_SOILGRIDS_DATA",
-        attempts,
-      }, { status: timedOut ? 504 : 404 });
+        mode,
+        layers: soil.layers,
+        sample: soil.sample,
+        soilGrids: { available: Boolean(soil.layers), service: soil.service, coverage: soil.coverage || null, attempts: soil.attempts, error: soil.error || null },
+      }, { headers: { "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } });
+    } catch (error) {
+      return NextResponse.json({ error: safeMessage(error), code: "SOIL_LAYER_UNAVAILABLE" }, { status: 200 });
     }
-    const topsoilProfile = mode === "topsoil" ? buildSoilProfile(layers, null) : null;
-    return NextResponse.json({
-      source: SOURCE,
-      mode,
-      sample,
-      attempts,
-      properties: SOIL_PROPERTIES,
-      depths: DEPTHS,
-      layers,
-      profile: topsoilProfile,
-      caveats: [
-        "SoilGrids predictions are made for 250 m cells. A small field may sit in one cell and its soil can differ from the cell average, especially near rivers, slopes or old field boundaries.",
-        "The range shown is a statistical prediction interval. Wide ranges, common for organic carbon, mean the model is unsure.",
-        "Bulk density here is the fine-earth fraction and does not capture compaction caused by machinery or recent field work.",
-        "Interpretations (ratings and limitations) are general guidance. Crop response depends on climate, management, crop and local soil tests.",
-      ],
-      generatedAt: new Date().toISOString(),
-    }, { headers: { "Cache-Control": "public, s-maxage=604800, stale-while-revalidate=2592000" } });
-  } catch (error) {
-    console.error("Agrimetry soil-health request failed:", error);
-    const status = Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 502;
-    return NextResponse.json({ error: String(error?.message || "Unable to retrieve soil information right now.").slice(0, 400) }, { status });
   }
+
+  const sampleCandidates = chooseSamplePoints(geometry);
+  const representative = sampleCandidates[0];
+  const [soilOutcome, smapOutcome] = await Promise.allSettled([
+    fetchSoilGrids(geometry, { mode: "topsoil" }),
+    fetchNasaSmapSoilMoisture(representative.point),
+  ]);
+
+  const soilResult = soilOutcome.status === "fulfilled"
+    ? soilOutcome.value
+    : { layers: null, sample: null, attempts: [], service: null, error: safeMessage(soilOutcome.reason) };
+  const soilMoisture = smapOutcome.status === "fulfilled"
+    ? { ...smapOutcome.value, samplePoint: { ...smapOutcome.value.samplePoint, where: representative.where } }
+    : { available: false, error: safeMessage(smapOutcome.reason), source: { name: "NASA SMAP via NASA POWER", nativeResolutionMetres: 9_000 }, summary: null, story: null, records: [] };
+
+  const layers = soilResult.layers || null;
+  const soilAvailable = Boolean(layers);
+  const waterAvailable = Boolean(soilMoisture.available);
+  const status = soilAvailable && waterAvailable ? "ready" : soilAvailable || waterAvailable ? "partial" : "degraded";
+  const warnings = [];
+  if (!soilAvailable) warnings.push(`SoilGrids is unavailable right now. ${soilResult.error || "Its WCS and REST access paths did not return usable values."} You can still use NASA soil-water context and enter your own laboratory soil-test values.`);
+  else if (soilResult.coverage && soilResult.coverage.returned < soilResult.coverage.requested) warnings.push(`SoilGrids returned ${soilResult.coverage.returned} of ${soilResult.coverage.requested} requested topsoil values. Missing properties remain unknown; the available values can still be used.`);
+  if (!waterAvailable) warnings.push(`NASA soil-water history is unavailable right now. ${soilMoisture.error || "The POWER endpoint did not return a valid time series."} Soil profile lookup and farmer soil tests can still be used.`);
+  else if (soilMoisture.kind === "wetness") warnings.push("The higher-resolution SMAP request was not accepted by NASA POWER, so Agrimetry is showing the coarser MERRA-2 wetness series instead. This is clearly labelled and is not presented as SMAP.");
+
+  const soilGridSource = {
+    name: "ISRIC SoilGrids 2.0",
+    provider: "ISRIC – World Soil Information (not NASA)",
+    accessMethod: soilResult.service || null,
+    endpoint: soilResult.service === "WCS" ? "maps.isric.org · OGC Web Coverage Service" : soilResult.service === "REST" ? "rest.isric.org · REST API" : soilResult.service === "WCS+REST" ? "ISRIC WCS + REST fallback" : null,
+    available: soilAvailable,
+    resolutionMetres: 250,
+    note: soilAvailable
+      ? `250 m machine-learning soil-property predictions obtained through ${soilResult.service || "ISRIC map services"}.`
+      : "The SoilGrids service did not return a usable profile for this request.",
+    license: "CC BY 4.0, ISRIC – World Soil Information",
+  };
+
+  return NextResponse.json({
+    mode,
+    status,
+    source: soilGridSource,
+    soilGrids: { available: soilAvailable, service: soilResult.service, coverage: soilResult.coverage || null, attempts: soilResult.attempts || [], error: soilResult.error || null },
+    sample: soilResult.sample || null,
+    properties: SOIL_PROPERTIES,
+    depths: DEPTHS,
+    layers,
+    profile: layers ? buildSoilProfile(layers, null) : null,
+    soilMoisture,
+    warnings,
+    caveats: BASE_CAVEATS,
+    generatedAt: new Date().toISOString(),
+  }, { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } });
 }

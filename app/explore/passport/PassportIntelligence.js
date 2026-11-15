@@ -239,7 +239,7 @@ export default function PassportIntelligence() {
         data: {
           climateHistory,
           waterStress,
-          soil: { layers: soilResult?.layers || null, sample: soilResult?.sample || null, test },
+          soil: { layers: soilResult?.layers || null, sample: soilResult?.sample || null, soilGrids: soilResult?.soilGrids || null, soilMoisture: soilResult?.soilMoisture || null, test },
           vegetation,
         },
       });
@@ -256,7 +256,7 @@ export default function PassportIntelligence() {
   const sourceRows = [
     ["climate", "NASA POWER climate history (25 years)"],
     ["water", "NASA POWER water-stress analysis"],
-    ["soil", "ISRIC SoilGrids soil profile"],
+    ["soil", "Soil profile + NASA SMAP water history"],
     ["vegetation", "Sentinel-2 vegetation of your field (can take up to 2 minutes)"],
   ];
 

@@ -1,0 +1,21 @@
+/* Replay page extras. Layout classes come from the other explore stylesheets. */
+.rp-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.rp-tab { padding: 5px 12px; border: 1px solid #d8e2d1; border-radius: 99px; background: #f4f8ef; font: inherit; font-size: 11px; font-weight: 700; color: #4d5c45; cursor: pointer; }
+.rp-tab.active { background: #426b46; border-color: #426b46; color: #fff; }
+.rp-grid-wrap { overflow-x: auto; margin-top: 8px; }
+.rp-grid { display: grid; gap: 3px; min-width: 640px; }
+.rp-row { display: grid; grid-template-columns: 110px repeat(var(--years), 1fr); gap: 3px; align-items: center; }
+.rp-row-label { font-size: 11px; font-weight: 700; color: #4d5c45; }
+.rp-year { font-size: 9px; text-align: center; color: #8a927f; }
+.rp-cell { height: 26px; border: 2px solid transparent; border-radius: 5px; padding: 0; cursor: pointer; }
+.rp-cell.selected { border-color: #1f3d2b; }
+.rp-cell.empty { background: #eee7d6; cursor: default; }
+.rp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 10px; color: #6f7a66; }
+.rp-detail { margin-top: 10px; padding: 12px 14px; border: 1px solid #ece3cf; border-radius: 10px; background: #fbf7ea; font-size: 12px; line-height: 1.6; color: #46553f; }
+.rp-detail h3 { margin: 0 0 4px; font-size: 13px; color: #3f5238; }
+.rp-sliders { display: grid; gap: 10px; }
+.rp-scenario-note { margin-top: 6px; font-size: 10px; color: #8a927f; line-height: 1.5; }
+.rp-matrix td.good, .rp-matrix td.bad { font-weight: 700; }
+.rp-matrix td.good { color: #2f6b3a; }
+.rp-matrix td.bad { color: #a63a2b; }
+.rp-matrix td small { display: block; font-weight: 500; color: #8a927f; }

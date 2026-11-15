@@ -746,8 +746,13 @@ export default function GlobalFarmMap() {
               <span className="agm-layer-caption">EARTH OBSERVATION</span>
               <label className="agm-layer-toggle"><span><strong>NASA MODIS true colour</strong><small>Global imagery · approx. 250 m · max zoom 9</small></span><input type="checkbox" checked={nasaOverlay} onChange={(event) => setNasaOverlay(event.target.checked)}/></label>
               <Link className="agm-planned-layer agm-available-layer" href="/explore/vegetation"><span>Vegetation · Sentinel-2 NDVI</span><em>Analyze field ↗</em></Link>
-              <div className="agm-planned-layer"><span>Soil moisture · SMAP</span><em>Next integration</em></div>
-              <div className="agm-planned-layer"><span>Rainfall · GPM</span><em>Next integration</em></div>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/water-stress"><span>Soil moisture · SMAP / POWER</span><em>Analyze field ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/water-stress"><span>Rainfall · GPM IMERG</span><em>Analyze field ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/bare-field"><span>Bare-field detection · Sentinel-2</span><em>Analyze field ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/soil-health"><span>Soil health · SoilGrids</span><em>Analyze field ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/rotation"><span>Crop rotation engine</span><em>Compare ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/replay"><span>Historical climate replay</span><em>Replay ↗</em></Link>
+              <Link className="agm-planned-layer agm-available-layer" href="/explore/passport"><span>Evidence passport</span><em>Report ↗</em></Link>
               <div className="agm-planned-layer"><span>Terrain · SRTM</span><em>Next integration</em></div>
             </div>}
           </section>

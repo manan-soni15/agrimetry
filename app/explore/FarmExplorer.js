@@ -238,7 +238,7 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
           <div className="fx-source-card-head"><span className="fx-overline">DATA LAYERS</span><span className="fx-live-pill"><i /> READY TO CONNECT</span></div>
           <div className="fx-layer-row fx-layer-active"><span className="fx-layer-icon"><Icon name="sun" /></span><span><strong>NASA POWER</strong><small>Daily temperature, rainfall, humidity, solar</small></span><span className="fx-layer-status">LIVE</span></div>
           <Link href="/explore/vegetation" className="fx-layer-row fx-layer-active fx-layer-link"><span className="fx-layer-icon"><Icon name="leaf" /></span><span><strong>Sentinel-2 · Vegetation</strong><small>Field NDVI and seasonal observations</small></span><span className="fx-layer-status">LIVE</span></Link>
-          {NEXT_LAYERS.map((layer) => <div className="fx-layer-row" key={layer.code}><span className="fx-layer-icon"><Icon name={layer.icon} /></span><span><strong>{layer.code} · {layer.title}</strong><small>{layer.detail}</small></span><span className="fx-layer-next">NEXT</span></div>)}
+          <Link href="/explore/water-stress" className="fx-layer-row fx-layer-active fx-layer-link"><span className="fx-layer-icon"><Icon name="droplet" /></span><span><strong>SMAP · GPM · Water stress</strong><small>Soil moisture, rainfall and drought signals</small></span><span className="fx-layer-status">LIVE</span></Link>
           <div className="fx-source-card-foot">NASA Earth observations + local farm context</div>
         </div>
 
@@ -304,7 +304,7 @@ function Dashboard({ farm, result, onEdit }) {
       <section className="fx-layers-section" id="fx-roadmap">
         <div className="fx-section-heading"><div><span className="fx-overline">04 / EXPANDING THE FINGERPRINT</span><h2>More layers. A fuller picture.</h2></div><span className="fx-coming-label">INTEGRATION ROADMAP</span></div>
         <div className="fx-next-grid">
-          {NEXT_LAYERS.map((layer, index) => <article className="fx-next-card" key={layer.code}><div className="fx-next-top"><span className="fx-next-icon"><Icon name={layer.icon} size={20} /></span><span>0{index + 2}</span></div><span className="fx-next-code">NASA {layer.code}</span><h3>{layer.title}</h3><p>{layer.detail}. This layer will add another independent environmental signal to the fingerprint.</p><span className="fx-roadmap-status"><i /> Planned integration</span></article>)}
+          {NEXT_LAYERS.map((layer, index) => <article className="fx-next-card" key={layer.code}><div className="fx-next-top"><span className="fx-next-icon"><Icon name={layer.icon} size={20} /></span><span>0{index + 2}</span></div><span className="fx-next-code">NASA {layer.code}</span><h3>{layer.title}</h3><p>{layer.detail}. Now available as field-level water-stress analysis plus NASA GIBS map layers.</p><Link href="/explore/water-stress" className="fx-roadmap-status"><i /> Open water stress</Link></article>)}
         </div>
       </section>
 
@@ -452,6 +452,12 @@ export default function FarmExplorer() {
           <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
           <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
           <Link href="/explore/vegetation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Field vegetation</span><em>LIVE</em></Link>
+          <Link href="/explore/water-stress" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="droplet" size={17} /><span>Water stress</span><em>LIVE</em></Link>
+          <Link href="/explore/bare-field" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Bare-field detection</span><em>LIVE</em></Link>
+          <Link href="/explore/soil-health" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Soil health</span><em>LIVE</em></Link>
+          <Link href="/explore/rotation" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="sprout" size={17} /><span>Rotation engine</span><em>NEW</em></Link>
+          <Link href="/explore/replay" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="calendar" size={17} /><span>Climate replay</span><em>NEW</em></Link>
+          <Link href="/explore/passport" className="fx-nav-map-link fx-nav-vegetation-link"><Icon name="leaf" size={17} /><span>Evidence passport</span><em>NEW</em></Link>
           <button onClick={() => handleNavClick('rotation')}><Icon name="sprout" size={17} /><span>Rotation explorer</span><em>SOON</em></button>
           <button onClick={() => handleNavClick('climate')}><Icon name="calendar" size={17} /><span>Climate replay</span><em>SOON</em></button>
         </nav>

@@ -287,3 +287,32 @@
 @media (prefers-reduced-motion: reduce) {
   .vi-progress-orbit::before, .vi-progress-orbit::after, .vi-progress-orbit i, .vi-progress-track span, .vi-progress-step.current > span { animation: none !important; }
 }
+
+/* Low-vegetation areas and previous-season comparison */
+.vi-check-row { display: flex; gap: 9px; align-items: flex-start; margin: 12px 0 4px; font-size: 11px; font-weight: 700; color: #3f5238; cursor: pointer; }
+.vi-check-row input { margin-top: 2px; accent-color: #426b46; }
+.vi-check-row small { display: block; margin-top: 2px; font-size: 10px; font-weight: 500; color: #7e8877; line-height: 1.4; }
+.vi-hotspot-toggle.active { border-color: #b8402f; background: #b8402f; }
+.vi-legend-hotspot { display: inline-flex; align-items: center; gap: 5px; margin-left: 14px; }
+.vi-legend-hotspot i { width: 11px; height: 11px; border-radius: 2px; background: #d64030; }
+.vi-chart-legend { display: flex; gap: 16px; margin-bottom: 4px; font-size: 10px; color: #6f7a66; }
+.vi-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.vi-chart-legend i { width: 18px; height: 0; border-top: 3px solid #315f3d; }
+.vi-chart-legend i.previous { border-top: 3px dashed #b8893a; }
+.vi-hotspot-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+.vi-hotspot-stats div { padding: 10px; border: 1px solid #ecd9d3; border-radius: 9px; background: #fbf1ee; }
+.vi-hotspot-stats span { display: block; font-size: 9px; color: #8a6a63; }
+.vi-hotspot-stats strong { font-size: 17px; color: #a63a2b; }
+.vi-method-note { display: block; margin-top: 8px; font-size: 10px; line-height: 1.5; color: #8a927f; }
+.vi-season-loading { display: flex; align-items: center; gap: 10px; }
+.vi-season-panel td.positive, .vi-season-panel strong.positive { color: #2f6b3a; }
+.vi-season-panel td.negative, .vi-season-panel strong.negative { color: #a63a2b; }
+
+/* Management zones and seasonal pattern */
+.vi-zone-bar { display: flex; height: 16px; margin: 12px 0 8px; overflow: hidden; border-radius: 6px; background: #eee7d6; }
+.vi-zone-bar i { display: block; height: 100%; }
+.vi-zone-list { margin: 6px 0 10px; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; color: #46553f; }
+.vi-zone-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vi-zone-list span { color: #6f7a66; }
+.vi-class-grid { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; font-size: 11px; color: #5b6a52; }
+.vi-hotspot-stats small { display: block; font-size: 10px; color: #8a6a63; }

@@ -75,6 +75,33 @@ function getNdviInterpretation(value) {
   return { label: "A strong green cover", detail: "The field is showing a strong vegetation greenness signal in the clear pixels. This is encouraging evidence of green cover, but it does not by itself prove plant health, soil fertility or expected yield." };
 }
 
+function shiftYearBack(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year - 1, month - 1, day));
+  // 29 Feb of a leap year rolls into March; clamp back to the last day of Feb.
+  if (shifted.getUTCMonth() !== month - 1) shifted.setUTCDate(0);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function buildSeasonComparison(current, previous) {
+  if (!current?.monthly || !previous?.monthly) return null;
+  const pairs = [];
+  current.monthly.forEach((item, index) => {
+    const before = previous.monthly[index];
+    if (Number.isFinite(item.meanNdvi) && Number.isFinite(before?.meanNdvi)) {
+      pairs.push({ month: item.month, previousMonth: before.month, current: item.meanNdvi, previous: before.meanNdvi, delta: item.meanNdvi - before.meanNdvi });
+    }
+  });
+  if (!pairs.length) return { pairs, averageDelta: null, higher: 0, lower: 0 };
+  const averageDelta = pairs.reduce((sum, pair) => sum + pair.delta, 0) / pairs.length;
+  return {
+    pairs,
+    averageDelta,
+    higher: pairs.filter((pair) => pair.delta >= 0.04).length,
+    lower: pairs.filter((pair) => pair.delta <= -0.04).length,
+  };
+}
+
 function formatObservationDate(value) {
   if (!value) return "the latest clear observation";
   const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
@@ -169,7 +196,7 @@ const LOADING_STAGES = [
   { title: "Finishing the field report", detail: "The imagery is still being processed. Larger fields, longer date ranges or slow public data downloads can take a few minutes." },
 ];
 
-function NdviChart({ data }) {
+function NdviChart({ data, previous }) {
   const validCount = data.filter((item) => Number.isFinite(item.meanNdvi)).length;
   if (validCount < 2) {
     return <div className="vi-chart-empty">At least two months with clear Sentinel-2 observations are needed to draw a trend.</div>;
@@ -201,8 +228,21 @@ function NdviChart({ data }) {
 
   const labelIndices = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])];
 
+  // Previous-season series is aligned by month position (same window, one year earlier).
+  const previousSegments = [];
+  if (previous?.length) {
+    let segment = [];
+    data.forEach((_, index) => {
+      const value = previous[index]?.meanNdvi;
+      if (Number.isFinite(value)) segment.push({ value, index, month: previous[index].month });
+      else if (segment.length) { previousSegments.push(segment); segment = []; }
+    });
+    if (segment.length) previousSegments.push(segment);
+  }
+
   return (
     <div className="vi-chart-wrap">
+      {previousSegments.length > 0 && <div className="vi-chart-legend"><span><i className="current"/> Selected period</span><span><i className="previous"/> Same months, previous year</span></div>}
       <svg className="vi-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly field mean NDVI time series">
         {[0, 0.25, 0.5, 0.75].map((tick) => <g key={tick}><line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} stroke="#e6dece" strokeDasharray="4 6"/><text x={left - 10} y={y(tick) + 4} textAnchor="end" fill="#8a927f" fontSize="11">{tick.toFixed(2)}</text></g>)}
         <defs><linearGradient id="viAreaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#6e925f" stopOpacity=".28"/><stop offset="100%" stopColor="#6e925f" stopOpacity=".015"/></linearGradient></defs>
@@ -213,6 +253,12 @@ function NdviChart({ data }) {
           const areaPath = `M ${x(first.index)} ${height - bottom} L ${segment.map(({ item, index }) => `${x(index)} ${y(item.meanNdvi)}`).join(" L ")} L ${x(last.index)} ${height - bottom} Z`;
           return <g key={`segment-${segmentIndex}`}><path d={areaPath} fill="url(#viAreaFill)"/><polyline points={points} fill="none" stroke="#315f3d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></g>;
         })}
+        {previousSegments.map((segment, segmentIndex) => (
+          <g key={`previous-${segmentIndex}`}>
+            {segment.length > 1 && <polyline points={segment.map(({ value, index }) => `${x(index)},${y(value)}`).join(" ")} fill="none" stroke="#b8893a" strokeWidth="2.4" strokeDasharray="6 5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {segment.map(({ value, index, month }) => <circle key={month} cx={x(index)} cy={y(value)} r="3.4" fill="#b8893a" stroke="#fbf9f3" strokeWidth="1.5"><title>{formatMonth(month)} (previous year): {value.toFixed(3)} NDVI</title></circle>)}
+          </g>
+        ))}
         {data.map((item, index) => Number.isFinite(item.meanNdvi) ? <circle key={item.month} cx={x(index)} cy={y(item.meanNdvi)} r="4.2" fill="#315f3d" stroke="#fbf9f3" strokeWidth="2"><title>{formatMonth(item.month)}: {item.meanNdvi.toFixed(3)} NDVI</title></circle> : null)}
         {labelIndices.map((index) => <text key={data[index].month} x={x(index)} y={height - 13} textAnchor={index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"} fill="#858c7c" fontSize="11">{formatMonth(data[index].month)}</text>)}
       </svg>
@@ -240,6 +286,13 @@ export default function VegetationIntelligence() {
   const [mapReady, setMapReady] = useState(false);
   const [basemap, setBasemap] = useState("satellite");
   const [showNdvi, setShowNdvi] = useState(true);
+  const [showHotspots, setShowHotspots] = useState(true);
+  const [showZones, setShowZones] = useState(false);
+  const [compareSeasons, setCompareSeasons] = useState(true);
+  const [previousResult, setPreviousResult] = useState(null);
+  const [previousLoading, setPreviousLoading] = useState(false);
+  const [previousError, setPreviousError] = useState("");
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -440,6 +493,104 @@ export default function VegetationIntelligence() {
     else map.once("load", addLayer);
   }, [result, showNdvi, mapReady]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    const imageUrl = result?.lowVegetation?.imageDataUrl;
+    if (!map || !imageUrl || !Array.isArray(result?.map?.coordinates)) return;
+    const addHotspots = () => {
+      if (!mapRef.current || mapRef.current !== map) return;
+      try {
+        if (map.getLayer("vi-hotspot-raster")) map.removeLayer("vi-hotspot-raster");
+        if (map.getSource("vi-hotspot")) map.removeSource("vi-hotspot");
+        map.addSource("vi-hotspot", { type: "image", url: imageUrl, coordinates: result.map.coordinates });
+        map.addLayer({
+          id: "vi-hotspot-raster",
+          type: "raster",
+          source: "vi-hotspot",
+          paint: { "raster-opacity": 0.9, "raster-resampling": "nearest" },
+          layout: { visibility: showHotspots ? "visible" : "none" },
+        }, map.getLayer("vi-field-line") ? "vi-field-line" : undefined);
+      } catch (hotspotError) {
+        console.error("Could not add the low-vegetation overlay:", hotspotError);
+      }
+    };
+    if (map.isStyleLoaded()) addHotspots();
+    else map.once("load", addHotspots);
+    // Visibility is handled by the effect below; do not re-add on toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getLayer("vi-hotspot-raster")) return;
+    map.setLayoutProperty("vi-hotspot-raster", "visibility", showHotspots ? "visible" : "none");
+  }, [showHotspots, result, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const imageUrl = result?.fieldVariability?.zonesImageDataUrl;
+    if (!map || !imageUrl || !Array.isArray(result?.map?.coordinates)) return;
+    const addZones = () => {
+      if (!mapRef.current || mapRef.current !== map) return;
+      try {
+        if (map.getLayer("vi-zones-raster")) map.removeLayer("vi-zones-raster");
+        if (map.getSource("vi-zones")) map.removeSource("vi-zones");
+        map.addSource("vi-zones", { type: "image", url: imageUrl, coordinates: result.map.coordinates });
+        map.addLayer({
+          id: "vi-zones-raster",
+          type: "raster",
+          source: "vi-zones",
+          paint: { "raster-opacity": 0.85, "raster-resampling": "nearest" },
+          layout: { visibility: "none" },
+        }, map.getLayer("vi-field-line") ? "vi-field-line" : undefined);
+      } catch (zoneError) {
+        console.error("Could not add the management-zone overlay:", zoneError);
+      }
+    };
+    if (map.isStyleLoaded()) addZones();
+    else map.once("load", addZones);
+  }, [result, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getLayer("vi-zones-raster")) return;
+    map.setLayoutProperty("vi-zones-raster", "visibility", showZones ? "visible" : "none");
+    // Show either the NDVI picture or the zones, not both stacked.
+    if (map.getLayer("vi-ndvi-raster")) map.setLayoutProperty("vi-ndvi-raster", "visibility", showZones ? "none" : (showNdvi ? "visible" : "none"));
+  }, [showZones, showNdvi, result, mapReady]);
+
+  async function requestVegetation(field, start, end) {
+    const response = await fetch("/api/vegetation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, startDate: start, endDate: end, cloudLimit: Number(cloudLimit) }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Vegetation analysis failed (HTTP ${response.status}).`);
+    if (!payload?.summary || !Array.isArray(payload?.monthly)) {
+      throw new Error("The satellite service returned an incomplete report. Please try a shorter date range or run the analysis again.");
+    }
+    return payload;
+  }
+
+  async function loadPreviousSeason(field, start, end, runId) {
+    setPreviousLoading(true);
+    setPreviousError("");
+    setPreviousResult(null);
+    try {
+      const previousStart = shiftYearBack(start);
+      if (previousStart < MIN_SENTINEL_DATE) {
+        throw new Error("The same window one year earlier is before Sentinel-2 Level-2A coverage begins, so no comparison is available.");
+      }
+      const payload = await requestVegetation(field, previousStart, shiftYearBack(end));
+      if (runIdRef.current === runId) setPreviousResult(payload);
+    } catch (previousRequestError) {
+      if (runIdRef.current === runId) setPreviousError(previousRequestError.message || "The previous-year comparison could not be completed.");
+    } finally {
+      if (runIdRef.current === runId) setPreviousLoading(false);
+    }
+  }
+
   async function runAnalysis(event) {
     event?.preventDefault();
     if (!selectedField) {
@@ -454,18 +605,17 @@ export default function VegetationIntelligence() {
     setError("");
     setMapError("");
     setResult(null);
+    setPreviousResult(null);
+    setPreviousError("");
+    setPreviousLoading(false);
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
     try {
-      const response = await fetch("/api/vegetation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ field: selectedField, startDate, endDate, cloudLimit: Number(cloudLimit) }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Vegetation analysis failed (HTTP ${response.status}).`);
-      if (!payload?.summary || !Array.isArray(payload?.monthly)) {
-        throw new Error("The satellite service returned an incomplete report. Please try a shorter date range or run the analysis again.");
-      }
+      const payload = await requestVegetation(selectedField, startDate, endDate);
       setResult(payload);
+      // Previous-year comparison runs after the main report is shown, so a slow or
+      // failed comparison never blocks the current analysis.
+      if (compareSeasons) loadPreviousSeason(selectedField, startDate, endDate, runId);
     } catch (requestError) {
       setError(requestError.message || "Unable to run Sentinel-2 vegetation analysis.");
     } finally {
@@ -476,7 +626,11 @@ export default function VegetationIntelligence() {
   function selectField(id) {
     const feature = fields.find((item, index) => fieldKey(item, index) === id);
     setSelectedFieldId(id);
+    runIdRef.current += 1;
     setResult(null);
+    setPreviousResult(null);
+    setPreviousError("");
+    setPreviousLoading(false);
     setError("");
     if (feature) {
       try { localStorage.setItem(SELECTED_FIELD_KEY, JSON.stringify(feature)); } catch {}
@@ -488,6 +642,10 @@ export default function VegetationIntelligence() {
     setBasemap(nextBasemap);
   }
 
+  const seasonComparison = useMemo(() => buildSeasonComparison(result, previousResult), [result, previousResult]);
+  const lowVegetation = result?.lowVegetation;
+  const fieldVariability = result?.fieldVariability;
+  const phenology = result?.phenology;
   const ndviLatestLabel = result?.summary?.latestMonth ? formatMonth(result.summary.latestMonth) : "No clear month";
   const validPixelCount = result?.summary?.validPixelCount || 0;
 
@@ -500,7 +658,7 @@ export default function VegetationIntelligence() {
           <span className="vi-divider"/>
           <div className="vi-header-title"><small>FIELD INTELLIGENCE</small><strong>Vegetation analysis</strong></div>
         </div>
-        <div className="vi-header-actions"><span className="vi-source-pill"><i/> COPERNICUS SENTINEL-2</span><Link href="/explore" className="vi-explore-link">Environmental explorer</Link></div>
+        <div className="vi-header-actions"><span className="vi-source-pill"><i/> COPERNICUS SENTINEL-2</span><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore" className="vi-explore-link">Environmental explorer</Link></div>
       </header>
 
       <div className="vi-content">
@@ -536,6 +694,7 @@ export default function VegetationIntelligence() {
                 <label>To<input type="date" min={startDate || MIN_SENTINEL_DATE} max={todayDate || undefined} value={endDate} onChange={(event) => setEndDate(event.target.value)}/></label>
               </div>
               <div className="vi-cloud-control"><div><label htmlFor="vi-cloud-limit">Scene cloud threshold</label><strong>{cloudLimit}%</strong></div><input id="vi-cloud-limit" type="range" min="10" max="90" step="5" value={cloudLimit} onChange={(event) => setCloudLimit(event.target.value)}/><small>Scenes with a higher metadata cloud percentage are excluded. Pixel-level cloud and shadow masking is applied separately using SCL.</small></div>
+              <label className="vi-check-row"><input type="checkbox" checked={compareSeasons} onChange={(event) => setCompareSeasons(event.target.checked)}/><span>Compare with the same months last year<small>Runs a second analysis for the previous year after the main report. This takes extra time.</small></span></label>
               <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField || !startDate || !endDate}><Icon name={loading ? "refresh" : "leaf"} size={17}/>{loading ? "Analysing Sentinel-2 scenes…" : "Run vegetation analysis"}</button>
               {error && <div className="vi-error" role="alert"><Icon name="info" size={17}/><span>{error}</span></div>}
               <div className="vi-source-note"><Icon name="info" size={15}/><p>Sentinel-2 is an ESA/Copernicus mission, not a NASA mission. Agrimetry discovers public Level-2A scenes through Element 84 Earth Search and processes their public Cloud-Optimized GeoTIFF assets directly. No Earth Engine account, API key or service-account environment variables are required.</p></div>
@@ -562,9 +721,9 @@ export default function VegetationIntelligence() {
                 </section>
               )}
               <div className="vi-map-card">
-                <div className="vi-map-card-head"><div><span className="vi-overline">FIELD VIEW</span><h2>{selectedName}</h2><small>{selectedArea} · outlined boundary</small></div><div className="vi-map-controls"><div className="vi-basemap-toggle"><button type="button" className={basemap === "satellite" ? "active" : ""} onClick={() => switchBasemap("satellite")}>Satellite</button><button type="button" className={basemap === "street" ? "active" : ""} onClick={() => switchBasemap("street")}>Street</button></div><button type="button" className={`vi-layer-toggle ${showNdvi && result ? "active" : ""}`} onClick={() => setShowNdvi((value) => !value)} disabled={!result}>NDVI {showNdvi && result ? "On" : "Off"}</button></div></div>
+                <div className="vi-map-card-head"><div><span className="vi-overline">FIELD VIEW</span><h2>{selectedName}</h2><small>{selectedArea} · outlined boundary</small></div><div className="vi-map-controls"><div className="vi-basemap-toggle"><button type="button" className={basemap === "satellite" ? "active" : ""} onClick={() => switchBasemap("satellite")}>Satellite</button><button type="button" className={basemap === "street" ? "active" : ""} onClick={() => switchBasemap("street")}>Street</button></div><button type="button" className={`vi-layer-toggle ${showNdvi && result ? "active" : ""}`} onClick={() => setShowNdvi((value) => !value)} disabled={!result}>NDVI {showNdvi && result ? "On" : "Off"}</button><button type="button" className={`vi-layer-toggle vi-hotspot-toggle ${showHotspots && lowVegetation?.imageDataUrl ? "active" : ""}`} onClick={() => setShowHotspots((value) => !value)} disabled={!lowVegetation?.imageDataUrl}>Low areas {showHotspots && lowVegetation?.imageDataUrl ? "On" : "Off"}</button><button type="button" className={`vi-layer-toggle ${showZones && fieldVariability?.zonesImageDataUrl ? "active" : ""}`} onClick={() => setShowZones((value) => !value)} disabled={!fieldVariability?.zonesImageDataUrl}>Zones {showZones && fieldVariability?.zonesImageDataUrl ? "On" : "Off"}</button></div></div>
                 <div className="vi-map-wrap"><div ref={mapContainerRef} className="vi-map-canvas"/>{!mapReady && <div className="vi-map-loading"><span className="vi-spinner"/><strong>Preparing selected field</strong></div>}{mapError && <div className="vi-map-error">{mapError}</div>}{!result && !loading && <div className="vi-map-hint">Run analysis to render the median NDVI image inside this saved field boundary.</div>}{loading && <div className="vi-map-hint vi-map-hint-loading">Your selected field is being analysed…</div>}</div>
-                <div className="vi-map-legend"><span>LOW NDVI</span><div className="vi-legend-ramp">{PALETTE.map((color) => <i key={color} style={{ background: color }}/>)}</div><span>HIGH NDVI</span></div>
+                <div className="vi-map-legend"><span>LOW NDVI</span><div className="vi-legend-ramp">{PALETTE.map((color) => <i key={color} style={{ background: color }}/>)}</div><span>HIGH NDVI</span>{lowVegetation?.imageDataUrl && <span className="vi-legend-hotspot"><i/> Unusually low area</span>}</div>
               </div>
 
               {!result ? (
@@ -585,16 +744,71 @@ export default function VegetationIntelligence() {
                     <div className="vi-ndvi-scale"><div className="vi-ndvi-scale-labels"><span>−1</span><span>0</span><span>+1</span></div><div className="vi-ndvi-scale-ramp"><i/><i/><i/><i/><i/></div><div className="vi-ndvi-scale-caption"><span>Water / very little green signal</span><span>More green vegetation signal</span></div><small>It is not a crop-health grade, soil-fertility test or yield prediction. Crop type and growth stage matter.</small></div>
                   </div>
                   <div className="vi-metrics-grid">
-                    <article className="vi-metric-card"><span>FIELD'S AVERAGE GREEN SIGNAL</span><strong>{formatNdvi(result.summary.meanNdvi)}</strong><small>Mean NDVI across valid pixels in the combined period image.</small></article>
+                    <article className="vi-metric-card"><span>FIELD&apos;S AVERAGE GREEN SIGNAL</span><strong>{formatNdvi(result.summary.meanNdvi)}</strong><small>Mean NDVI across valid pixels in the combined period image.</small></article>
                     <article className="vi-metric-card"><span>THE TYPICAL PIXEL</span><strong>{formatNdvi(result.summary.medianNdvi)}</strong><small>Median NDVI; less affected by unusually high or low pixels.</small></article>
                     <article className="vi-metric-card"><span>MONTHS WITH OBSERVATIONS</span><strong>{result.summary.validMonths} / {result.summary.totalMonths}</strong><small>Months with at least one usable Sentinel-2 scene.</small></article>
                     <article className="vi-metric-card"><span>VISIBLE FIELD COVERAGE</span><strong>{Number.isFinite(result.summary.validPixelFraction) ? `${(result.summary.validPixelFraction * 100).toFixed(1)}%` : "—"}</strong><small>Share of expected pixels usable on the latest processed scene.</small></article>
                   </div>
                   <div className="vi-analysis-grid">
-                    <section className="vi-white-panel vi-trend-panel"><div className="vi-panel-title"><div><span className="vi-overline">04 / TIME SERIES</span><h2>How the green cover changed</h2><p>Each point shows the average NDVI from one usable observation in that month. Gaps mean no clear reading was available.</p></div><span className="vi-panel-stamp">{result.summary.validMonths}/{result.summary.totalMonths} months</span></div><NdviChart data={result.monthly}/><div className="vi-trend-foot"><span>Latest clear month: <strong>{ndviLatestLabel}</strong></span><span>Change vs previous clear month: <strong className={monthDelta == null ? "" : monthDelta < 0 ? "negative" : "positive"}>{monthDelta == null ? "—" : `${monthDelta > 0 ? "+" : ""}${monthDelta.toFixed(3)}`}</strong></span></div></section>
+                    <section className="vi-white-panel vi-trend-panel"><div className="vi-panel-title"><div><span className="vi-overline">04 / TIME SERIES</span><h2>How the green cover changed</h2><p>Each point shows the average NDVI from one usable observation in that month. Gaps mean no clear reading was available.</p></div><span className="vi-panel-stamp">{result.summary.validMonths}/{result.summary.totalMonths} months</span></div><NdviChart data={result.monthly} previous={previousResult?.monthly}/><div className="vi-trend-foot"><span>Latest clear month: <strong>{ndviLatestLabel}</strong></span><span>Change vs previous clear month: <strong className={monthDelta == null ? "" : monthDelta < 0 ? "negative" : "positive"}>{monthDelta == null ? "—" : `${monthDelta > 0 ? "+" : ""}${monthDelta.toFixed(3)}`}</strong></span></div></section>
                     <section className="vi-white-panel vi-interpret-panel"><span className="vi-overline">05 / READING THE RESULT</span><h2>{interpretation.label}</h2><p>{interpretation.detail}</p><p className="vi-plain-language">A higher number usually means more green leaf cover was visible to the satellite. It does not automatically mean a healthier crop.</p><div className="vi-interpret-divider"/><div className="vi-interpret-row"><span>Clear-observation months</span><strong>{result.summary.validMonths} / {result.summary.totalMonths}</strong></div><div className="vi-interpret-row"><span>Cloud threshold</span><strong>≤ {result.period.cloudLimit}%</strong></div><div className="vi-interpret-row"><span>Effective output scale</span><strong>{result.quality.scaleMetres} metres</strong></div><div className="vi-interpret-row"><span>Rendered valid grid cells</span><strong>{validPixelCount.toLocaleString()}</strong></div><div className="vi-interpret-row"><span>Skipped scene candidates</span><strong>{result.quality.skippedSceneCount}</strong></div></section>
                   </div>
-                  <section className="vi-white-panel vi-observation-table"><div className="vi-panel-title"><div><span className="vi-overline">06 / MONTHLY OBSERVATIONS</span><h2>Observation record</h2></div><span className="vi-panel-stamp">Sentinel-2 L2A · Earth Search</span></div><div className="vi-table-scroll"><table><thead><tr><th>Month</th><th>Observation</th><th>Average green signal</th><th>Typical pixel</th><th>Scene cloud</th><th>Clear pixels</th></tr></thead><tbody>{result.monthly.map((item) => <tr key={item.month}><td>{formatMonth(item.month)}</td><td>{item.observedAt ? new Date(item.observedAt).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "No clear scene"}</td><td>{formatNdvi(item.meanNdvi)}</td><td>{formatNdvi(item.medianNdvi)}</td><td>{Number.isFinite(item.cloudCover) ? `${item.cloudCover.toFixed(1)}%` : "—"}</td><td>{item.validPixelCount.toLocaleString()}</td></tr>)}</tbody></table></div></section>
+                  <div className="vi-analysis-grid">
+                    <section className="vi-white-panel vi-hotspot-panel">
+                      <span className="vi-overline">06 / UNUSUALLY LOW AREAS</span>
+                      <h2>{lowVegetation?.available ? (lowVegetation.pixelCount ? "Parts of the field are noticeably less green" : "No clearly weaker area found") : "Within-field comparison unavailable"}</h2>
+                      {lowVegetation?.available ? (
+                        <>
+                          <p>{lowVegetation.description}</p>
+                          {lowVegetation.pixelCount > 0 && <div className="vi-hotspot-stats"><div><span>Area flagged</span><strong>{lowVegetation.areaHectares.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</strong></div><div><span>Share of clear pixels</span><strong>{(lowVegetation.fractionOfValidPixels * 100).toFixed(1)}%</strong></div><div><span>NDVI below</span><strong>{lowVegetation.thresholdNdvi.toFixed(2)}</strong></div></div>}
+                          <p className="vi-plain-language">Red areas on the map are the places worth walking first. The satellite cannot say why they are lower: it may be a wet patch, headland, compaction, poor emergence, pests, or just a different crop stage.</p>
+                          <small className="vi-method-note">{lowVegetation.method}</small>
+                        </>
+                      ) : <p>{lowVegetation?.reason || "Not enough information to compare areas within this field."}</p>}
+                    </section>
+                    <section className="vi-white-panel vi-season-panel">
+                      <span className="vi-overline">07 / COMPARED WITH LAST YEAR</span>
+                      <h2>{!compareSeasons ? "Comparison switched off" : previousLoading ? "Loading last year&apos;s observations…" : previousError ? "Comparison unavailable" : seasonComparison?.pairs?.length ? (seasonComparison.averageDelta >= 0.04 ? "Greener than the same months last year" : seasonComparison.averageDelta <= -0.04 ? "Less green than the same months last year" : "Similar to the same months last year") : "No months to compare"}</h2>
+                      {!compareSeasons && <p>Tick “Compare with the same months last year” and run the analysis again to see this.</p>}
+                      {compareSeasons && previousLoading && <p className="vi-season-loading"><span className="vi-spinner"/> Analysing the previous year&apos;s Sentinel-2 scenes. The current report above is already complete.</p>}
+                      {compareSeasons && previousError && <p>{previousError}</p>}
+                      {compareSeasons && seasonComparison && !previousLoading && (seasonComparison.pairs.length ? (
+                        <>
+                          <p>Across {seasonComparison.pairs.length} month{seasonComparison.pairs.length === 1 ? "" : "s"} with clear readings in both years, the average NDVI differed by <strong className={seasonComparison.averageDelta < 0 ? "negative" : "positive"}>{seasonComparison.averageDelta > 0 ? "+" : ""}{seasonComparison.averageDelta.toFixed(3)}</strong>. It was higher in {seasonComparison.higher} and lower in {seasonComparison.lower} of those months (differences under 0.04 count as similar).</p>
+                          <div className="vi-table-scroll"><table><thead><tr><th>Month</th><th>This period</th><th>Last year</th><th>Difference</th></tr></thead><tbody>{seasonComparison.pairs.map((pair) => <tr key={pair.month}><td>{formatMonth(pair.month)}</td><td>{formatNdvi(pair.current)}</td><td>{formatNdvi(pair.previous)}</td><td className={pair.delta < 0 ? "negative" : "positive"}>{pair.delta > 0 ? "+" : ""}{pair.delta.toFixed(3)}</td></tr>)}</tbody></table></div>
+                          <small className="vi-method-note">Differences can come from a different crop, sowing date or weather, not only crop condition. Months are matched by calendar position; each uses one clear scene.</small>
+                        </>
+                      ) : <p>No month had a clear reading in both years, so a fair comparison is not possible. Try a higher cloud threshold or a different window.</p>)}
+                    </section>
+                  </div>
+                                    <div className="vi-analysis-grid">
+                    <section className="vi-white-panel vi-zones-panel">
+                      <span className="vi-overline">08 / MANAGEMENT ZONES</span>
+                      <h2>{fieldVariability?.available ? `The field is ${fieldVariability.uniformity}` : "Within-field zones unavailable"}</h2>
+                      {fieldVariability?.available ? (
+                        <>
+                          <p>{fieldVariability.guidance}</p>
+                          <div className="vi-zone-bar" role="img" aria-label="Share of the field in each relative zone">{fieldVariability.relative.zones.map((zone) => <i key={zone.index} style={{ width: `${zone.share * 100}%`, background: zone.color }} title={`${zone.label}: ${zone.areaHectares.toFixed(2)} ha`}/>)}</div>
+                          <ul className="vi-zone-list">{fieldVariability.relative.zones.map((zone) => <li key={zone.index}><b className="ws-dot" style={{ background: zone.color }}/> <strong>{zone.label}</strong><span>{zone.areaHectares.toFixed(2)} ha ({(zone.share * 100).toFixed(0)}%) · average NDVI {zone.meanNdvi.toFixed(2)}</span></li>)}</ul>
+                          <div className="vi-hotspot-stats"><div><span>Typical NDVI</span><strong>{fieldVariability.meanNdvi.toFixed(2)}</strong></div><div><span>Spread (P10–P90)</span><strong>{fieldVariability.p10.toFixed(2)}–{fieldVariability.p90.toFixed(2)}</strong></div><div><span>Clear area measured</span><strong>{fieldVariability.areaHectares.toFixed(1)} ha</strong></div></div>
+                          <div className="vi-class-grid">{fieldVariability.absolute.filter((c) => c.pixelCount > 0).map((cls) => <span key={cls.key}><b className="ws-dot" style={{ background: cls.color }}/> {cls.label}: {cls.areaHectares.toFixed(2)} ha ({(cls.share * 100).toFixed(0)}%)</span>)}</div>
+                          <small className="vi-method-note">{fieldVariability.method} Turn on the <strong>Zones</strong> layer on the map to see where they fall.</small>
+                        </>
+                      ) : <p>{fieldVariability?.reason || "Not enough clear pixels."}</p>}
+                    </section>
+                    <section className="vi-white-panel vi-phenology-panel">
+                      <span className="vi-overline">09 / SEASONAL PATTERN</span>
+                      <h2>{phenology?.available ? phenology.pattern.charAt(0).toUpperCase() + phenology.pattern.slice(1) : "Seasonal pattern unavailable"}</h2>
+                      {phenology?.available ? (
+                        <>
+                          <div className="vi-hotspot-stats"><div><span>Greenest month</span><strong>{phenology.peak.label}</strong><small>NDVI {phenology.peak.ndvi.toFixed(2)}</small></div><div><span>Least green</span><strong>{phenology.trough.label}</strong><small>NDVI {phenology.trough.ndvi.toFixed(2)}</small></div><div><span>Seasonal swing</span><strong>{phenology.amplitude.toFixed(2)}</strong><small>{phenology.greenMonths} green month{phenology.greenMonths === 1 ? "" : "s"}</small></div></div>
+                          <p>The field was most active from {formatMonth(phenology.activeFrom)} to {formatMonth(phenology.activeTo)} (months above the halfway point between its lowest and highest greenness).{phenology.fastestRise ? ` Greenness rose fastest between ${formatMonth(phenology.fastestRise.from)} and ${formatMonth(phenology.fastestRise.to)} (+${phenology.fastestRise.change.toFixed(2)}).` : ""}{phenology.fastestFall ? ` It dropped fastest between ${formatMonth(phenology.fastestFall.from)} and ${formatMonth(phenology.fastestFall.to)} (${phenology.fastestFall.change.toFixed(2)}), which can be harvest, senescence or clearing.` : ""}</p>
+                          <small className="vi-method-note">{phenology.note}</small>
+                        </>
+                      ) : <p>{phenology?.reason || "Not enough observations."}</p>}
+                    </section>
+                  </div>
+                  <section className="vi-white-panel vi-observation-table"><div className="vi-panel-title"><div><span className="vi-overline">10 / MONTHLY OBSERVATIONS</span><h2>Observation record</h2></div><span className="vi-panel-stamp">Sentinel-2 L2A · Earth Search</span></div><div className="vi-table-scroll"><table><thead><tr><th>Month</th><th>Observation</th><th>Average green signal</th><th>Typical pixel</th><th>Scene cloud</th><th>Clear pixels</th></tr></thead><tbody>{result.monthly.map((item) => <tr key={item.month}><td>{formatMonth(item.month)}</td><td>{item.observedAt ? new Date(item.observedAt).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "No clear scene"}</td><td>{formatNdvi(item.meanNdvi)}</td><td>{formatNdvi(item.medianNdvi)}</td><td>{Number.isFinite(item.cloudCover) ? `${item.cloudCover.toFixed(1)}%` : "—"}</td><td>{item.validPixelCount.toLocaleString()}</td></tr>)}</tbody></table></div></section>
                   <section className="vi-caveats"><div><span className="vi-overline">READ THE DATA RESPONSIBLY</span><h3>What NDVI can—and cannot—tell you.</h3></div><ul>{result.caveats.map((item) => <li key={item}>{item}</li>)}</ul></section>
                   <div className="vi-source-footer"><span>DATA: COPERNICUS SENTINEL-2 MSI L2A · {result.source.collection}</span><span>{result.source.attribution}</span><a href="https://earth-search.aws.element84.com/v1/collections/sentinel-2-c1-l2a" target="_blank" rel="noreferrer">Earth Search collection <Icon name="external" size={12}/></a></div>
                 </>

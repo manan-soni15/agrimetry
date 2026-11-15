@@ -1,0 +1,11 @@
+/* Bare-field page extras. Layout classes come from ../vegetation/vegetation.css and ../water-stress/water-stress.css. */
+.bf-opps { display: grid; gap: 10px; margin-top: 10px; }
+.bf-opp { padding: 12px 14px; border: 1px solid #dfe8d6; border-radius: 10px; background: #f4f8ef; }
+.bf-opp-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bf-opp-head strong { font-size: 13px; color: #2f4d33; }
+.bf-opp p { margin: 6px 0; font-size: 12px; line-height: 1.55; color: #46553f; }
+.bf-opp small { font-size: 10px; color: #7e8877; }
+.bf-chip { padding: 2px 8px; border-radius: 99px; font-size: 9px; font-weight: 800; color: #fff; background: #6e925f; }
+.bf-priority-high { background: #c2412f; }
+.bf-priority-medium { background: #e08a3c; }
+.bf-empty { margin: 10px 0 0; font-size: 12px; line-height: 1.55; color: #6f7a66; }

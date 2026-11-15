@@ -1,7 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { area as calculateArea } from '@turf/area';
+import VegetationIntelligence from './VegetationIntelligence';
+import WaterStressIntelligence from './WaterStressIntelligence';
+import InfoTip from './InfoTip';
+import {
+  BENCHMARK_FARM,
+  DEFAULT_FARM,
+  deserializeActiveFarm,
+  hasValidCoordinates,
+  parseFarmFromUrl,
+  resolveActiveView,
+  serializeActiveFarm,
+  VIEW_TITLES,
+} from '../../lib/explore/explore-state.js';
 
 const PRIORITY_OPTIONS = [
   { id: 'water', label: 'Conserve water', icon: 'droplet' },
@@ -11,9 +25,9 @@ const PRIORITY_OPTIONS = [
 ];
 
 const NEXT_LAYERS = [
-  { code: 'SMAP', title: 'Soil moisture', detail: 'Surface and root-zone moisture', status: 'Next integration', icon: 'droplet' },
-  { code: 'GPM', title: 'Precipitation', detail: 'Satellite rainfall estimates', status: 'Next integration', icon: 'rain' },
-  { code: 'Landsat', title: 'Vegetation', detail: 'NDVI and seasonal field patterns', status: 'Next integration', icon: 'leaf' },
+  { code: 'ECOSTRESS', title: 'Evaporative Stress', detail: 'Thermal plant water use and stress', status: 'Next integration', icon: 'sun' },
+  { code: 'GRACE-FO', title: 'Groundwater Storage', detail: 'Regional terrestrial water storage anomalies', status: 'Next integration', icon: 'droplet' },
+  { code: 'Landsat 9', title: 'Multi-Decadal Context', detail: '30 m long-term thermal & reflectance archive', status: 'Next integration', icon: 'leaf' },
 ];
 
 function Icon({ name, size = 18, strokeWidth = 1.7 }) {
@@ -126,9 +140,168 @@ function MapPreview({ latitude, longitude, location }) {
   );
 }
 
-function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searchLoading, searchResults, searchError, onSelectLocation, onUseLocation }) {
+/**
+ * Reusable Active Field Context Banner shown across intelligence subviews
+ */
+function ActiveFieldStrip({ farm, onEdit, savedFields = [], onSelectSavedField }) {
+  const lat = Number(farm.latitude);
+  const lon = Number(farm.longitude);
+
+  return (
+    <div className="fx-context-strip">
+      <div className="fx-context-pin"><Icon name="pin" size={17} /></div>
+      <div className="fx-context-location">
+        <strong>{farm.name || 'Selected field'}</strong>
+        <span>
+          {Number.isFinite(lat) ? lat.toFixed(4) : '—'}°, {Number.isFinite(lon) ? lon.toFixed(4) : '—'}° · {farm.area ? `${farm.area} ${farm.areaUnit}` : 'Area not specified'}
+        </span>
+      </div>
+      <div className="fx-context-divider" />
+      <div className="fx-context-detail">
+        <small>LOCATION</small>
+        <strong>{farm.location || 'Manual coordinates'}</strong>
+      </div>
+      {farm.currentCrop && (
+        <>
+          <div className="fx-context-divider" />
+          <div className="fx-context-detail">
+            <small>CURRENT CROP</small>
+            <strong>{farm.currentCrop}</strong>
+          </div>
+        </>
+      )}
+      <div className="fx-active-strip-actions">
+        {savedFields.length > 1 && (
+          <select
+            className="fx-saved-field-select"
+            style={{ padding: '6px 10px', fontSize: '11px', borderRadius: '8px' }}
+            value={farm.fieldId || ''}
+            onChange={(event) => {
+              const targetId = event.target.value;
+              const found = savedFields.find((f, idx) => String(f.id || `field-${idx}`) === targetId);
+              if (found && onSelectSavedField) onSelectSavedField(found);
+            }}
+          >
+            <option value="" disabled>Switch field...</option>
+            {savedFields.map((f, idx) => (
+              <option key={f.id || idx} value={String(f.id || `field-${idx}`)}>
+                {f.properties?.fieldName || `Field ${idx + 1}`}
+              </option>
+            ))}
+          </select>
+        )}
+        <button type="button" className="fx-outline-button" onClick={onEdit} style={{ padding: '6px 12px', fontSize: '11px' }}>
+          <Icon name="map" size={13} /> Edit field profile
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Helpful Prompt banner when user enters a satellite feature view without an active field
+ */
+function NoFieldPrompt({ featureName, onSelectBenchmark, onGoToOverview, savedFields = [], onSelectSavedField }) {
+  return (
+    <div className="fx-field-prompt-card">
+      <div className="fx-prompt-head">
+        <div className="fx-prompt-icon"><Icon name="pin" size={22} /></div>
+        <div>
+          <h3>Select a field to analyze {featureName}</h3>
+          <p>
+            Satellite observations and environmental indicators are computed for specific geographic boundaries.
+            Choose or find your field to begin:
+          </p>
+        </div>
+      </div>
+
+      <div className="fx-prompt-actions">
+        <button type="button" className="fx-prompt-btn-primary" onClick={onGoToOverview}>
+          <Icon name="search" size={15} />
+          <span>Find my farm (Search location)</span>
+        </button>
+
+        <Link href="/explore/map" className="fx-prompt-btn-secondary">
+          <Icon name="map" size={15} />
+          <span>Draw on Global Farm Map</span>
+        </Link>
+
+        {savedFields.length > 0 && (
+          <select
+            className="fx-saved-field-select"
+            style={{ padding: '9px 12px', fontSize: '12px', borderRadius: '10px' }}
+            defaultValue=""
+            onChange={(event) => {
+              const targetId = event.target.value;
+              const found = savedFields.find((f, idx) => String(f.id || `field-${idx}`) === targetId);
+              if (found && onSelectSavedField) onSelectSavedField(found);
+            }}
+          >
+            <option value="" disabled>Choose from {savedFields.length} mapped field(s)...</option>
+            {savedFields.map((f, idx) => (
+              <option key={f.id || idx} value={String(f.id || `field-${idx}`)}>
+                {f.properties?.fieldName || `Field ${idx + 1}`}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button type="button" className="fx-prompt-btn-secondary" onClick={onSelectBenchmark}>
+          <Icon name="leaf" size={14} />
+          <span>Try benchmark field (Jaipur)</span>
+        </button>
+      </div>
+
+      <div
+        className="fx-field-prompt-info"
+        style={{
+          marginTop: '16px',
+          paddingTop: '14px',
+          borderTop: '1px solid #e7ded2',
+          fontSize: '11.5px',
+          color: '#6d6252',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '12px',
+        }}
+      >
+        <div>
+          <strong style={{ color: '#244f38', display: 'block', marginBottom: '2px' }}>Field boundary:</strong>
+          The outline showing the exact land you want to analyse.
+        </div>
+        <div>
+          <strong style={{ color: '#244f38', display: 'block', marginBottom: '2px' }}>Coordinates:</strong>
+          The geographic location on Earth used to find satellite overpasses.
+        </div>
+        <div>
+          <strong style={{ color: '#244f38', display: 'block', marginBottom: '2px' }}>Field area:</strong>
+          The approximate size of your land used to evaluate satellite coverage.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SetupScreen({
+  farm,
+  setFarm,
+  onAnalyze,
+  loading,
+  error,
+  onSearch,
+  searchLoading,
+  searchResults,
+  searchError,
+  onSelectLocation,
+  onUseLocation,
+  savedFields = [],
+  onSelectSavedField,
+  onNavigateToView,
+  onLoadBenchmark,
+  mounted = false,
+}) {
   const [showCoordinates, setShowCoordinates] = useState(false);
-  const selected = Number.isFinite(Number(farm.latitude)) && Number.isFinite(Number(farm.longitude)) && farm.latitude !== '' && farm.longitude !== '';
+  const selected = mounted && hasValidCoordinates(farm);
   const togglePriority = (id) => {
     setFarm((current) => ({
       ...current,
@@ -145,20 +318,102 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
         <h1 className="fx-page-title">Every field has a <em>fingerprint.</em></h1>
         <p className="fx-page-intro">Start with a place. Agrimetry will assemble its environmental story from NASA climate data and your local farm context.</p>
 
+        {selected ? (
+          <div className="fx-quick-jump-banner">
+            <div className="fx-quick-jump-text">
+              <Icon name="check" size={16} />
+              <span>
+                <strong>Your field is ready:</strong> {farm.name || 'Selected Field'} ({Number(farm.latitude).toFixed(4)}°, {Number(farm.longitude).toFixed(4)}°).
+                Choose an intelligence feature below to explore:
+              </span>
+            </div>
+            <div className="fx-quick-jump-pills">
+              <button type="button" className="fx-quick-jump-pill" onClick={() => onNavigateToView('vegetation')}>
+                <Icon name="leaf" size={13} /> See crop greenness (Sentinel-2)
+              </button>
+              <button type="button" className="fx-quick-jump-pill" onClick={() => onNavigateToView('water')}>
+                <Icon name="droplet" size={13} /> Check soil moisture &amp; water (SMAP)
+              </button>
+              <button type="button" className="fx-quick-jump-pill" onClick={() => onNavigateToView('environment')}>
+                <Icon name="compass" size={13} /> View climate baseline (NASA POWER)
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="fx-onboarding-guide">
+            <div className="fx-onboarding-head">
+              <Icon name="sprout" size={20} />
+              <h3>How Agrimetry Works for Your Land</h3>
+            </div>
+            <p className="fx-onboarding-desc">
+              Start by finding your farm. Agrimetry uses your field boundary to extract Sentinel-2 vegetation health and NASA SMAP root-zone soil moisture for your exact acreage.
+            </p>
+            <div className="fx-onboarding-steps">
+              <div className="fx-onboarding-step">
+                <span className="fx-onboarding-step-num">Step 1 · Find Place</span>
+                <span className="fx-onboarding-step-text">Search village, town, or enter coordinates below.</span>
+              </div>
+              <div className="fx-onboarding-step">
+                <span className="fx-onboarding-step-num">Step 2 · Set Boundary</span>
+                <span className="fx-onboarding-step-text">Choose a mapped boundary or draw on the satellite map.</span>
+              </div>
+              <div className="fx-onboarding-step">
+                <span className="fx-onboarding-step-num">Step 3 · Explore Insights</span>
+                <span className="fx-onboarding-step-text">View crop greenness, soil moisture, and climate baselines.</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form className="fx-form-card" onSubmit={onAnalyze}>
           <div className="fx-form-heading">
             <div><span className="fx-step-number">01 / FARM PROFILE</span><h2>Tell us about your land</h2></div>
             <span className="fx-form-mark"><Icon name="sprout" size={23} /></span>
           </div>
 
+          {mounted && savedFields.length > 0 && (
+            <div className="fx-saved-field-picker">
+              <div className="fx-saved-field-picker-text">
+                <strong>Mapped fields detected from Global Farm Map ({savedFields.length})</strong>
+                <small>Choose a mapped boundary to analyze its exact geometry, or enter a new location below.</small>
+              </div>
+              <select
+                className="fx-saved-field-select"
+                value={farm.fieldId || ''}
+                onChange={(event) => {
+                  const targetId = event.target.value;
+                  const found = savedFields.find((f, idx) => String(f.id || `field-${idx}`) === targetId);
+                  if (found) onSelectSavedField(found);
+                }}
+              >
+                <option value="">Choose mapped field...</option>
+                {savedFields.map((f, idx) => (
+                  <option key={f.id || idx} value={String(f.id || `field-${idx}`)}>
+                    {f.properties?.fieldName || `Field ${idx + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="fx-field-grid">
             <label className="fx-field fx-span-2">
-              <span>Farm or field name</span>
+              <span>
+                Farm or field name
+                <InfoTip title="Farm Name" label="About field name">
+                  A recognizable label for your field so you can identify it when exploring satellite indices or switching between saved fields.
+                </InfoTip>
+              </span>
               <input value={farm.name} onChange={(event) => setFarm({ ...farm, name: event.target.value })} placeholder="e.g. North Field" maxLength={70} />
             </label>
 
             <div className="fx-field fx-span-2">
-              <label htmlFor="farm-location">Where is your farm?</label>
+              <label htmlFor="farm-location">
+                Where is your farm?
+                <InfoTip title="Finding Your Field" label="About field location">
+                  Search by village, district, or landmark, click below to use your device location, or enter exact latitude and longitude coordinates.
+                </InfoTip>
+              </label>
               <div className="fx-search-row">
                 <div className="fx-input-icon"><Icon name="search" size={17} /><input id="farm-location" value={farm.locationQuery} onChange={(event) => setFarm({ ...farm, locationQuery: event.target.value, latitude: '', longitude: '', location: '' })} placeholder="Search village, town, region or country" maxLength={100} /></div>
                 <button type="button" className="fx-search-button" onClick={onSearch} disabled={searchLoading || farm.locationQuery.trim().length < 2}>{searchLoading ? <span className="fx-spinner" /> : <Icon name="arrow" size={17} />}<span>{searchLoading ? 'Searching' : 'Find'}</span></button>
@@ -166,6 +421,11 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
               <div className="fx-location-tools">
                 <button type="button" onClick={onUseLocation}><Icon name="crosshair" size={14} /> Use my current location</button>
                 <button type="button" onClick={() => setShowCoordinates((value) => !value)}>{showCoordinates ? 'Hide coordinates' : 'Enter coordinates manually'}</button>
+                {!selected && (
+                  <button type="button" onClick={onLoadBenchmark} style={{ color: '#244f38', fontWeight: 600 }}>
+                    <Icon name="leaf" size={14} /> Try benchmark field (Jaipur)
+                  </button>
+                )}
               </div>
               {searchError && <p className="fx-inline-error">{searchError}</p>}
               {searchResults.length > 0 && (
@@ -183,13 +443,37 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
             </div>
 
             {showCoordinates && <>
-              <label className="fx-field"><span>Latitude</span><input type="number" step="any" min="-90" max="90" value={farm.latitude} onChange={(event) => setFarm({ ...farm, latitude: event.target.value, location: 'Manual coordinates' })} placeholder="e.g. 26.9124" /></label>
-              <label className="fx-field"><span>Longitude</span><input type="number" step="any" min="-180" max="180" value={farm.longitude} onChange={(event) => setFarm({ ...farm, longitude: event.target.value, location: 'Manual coordinates' })} placeholder="e.g. 75.7873" /></label>
+              <label className="fx-field">
+                <span>
+                  Latitude
+                  <InfoTip title="Latitude" label="About latitude" technicalNote="WGS84 decimal degrees (-90 to +90)">
+                    The north/south geographic coordinate of your field center.
+                  </InfoTip>
+                </span>
+                <input type="number" step="any" min="-90" max="90" value={farm.latitude} onChange={(event) => setFarm({ ...farm, latitude: event.target.value, location: 'Manual coordinates' })} placeholder="e.g. 26.9124" />
+              </label>
+              <label className="fx-field">
+                <span>
+                  Longitude
+                  <InfoTip title="Longitude" label="About longitude" technicalNote="WGS84 decimal degrees (-180 to +180)">
+                    The east/west geographic coordinate of your field center.
+                  </InfoTip>
+                </span>
+                <input type="number" step="any" min="-180" max="180" value={farm.longitude} onChange={(event) => setFarm({ ...farm, longitude: event.target.value, location: 'Manual coordinates' })} placeholder="e.g. 75.7873" />
+              </label>
             </>}
 
             {selected && <div className="fx-selected-place fx-span-2"><span className="fx-selected-check"><Icon name="check" size={14} /></span><div><strong>{farm.location || 'Coordinates selected'}</strong><small>{Number(farm.latitude).toFixed(4)}, {Number(farm.longitude).toFixed(4)} · Global point analysis</small></div><button type="button" onClick={() => setFarm({ ...farm, latitude: '', longitude: '', location: '' })}>Change</button></div>}
 
-            <label className="fx-field"><span>Farm area <small>(optional)</small></span><div className="fx-input-suffix"><input type="number" min="0" step="0.1" value={farm.area} onChange={(event) => setFarm({ ...farm, area: event.target.value })} placeholder="e.g. 5" /><span>{farm.areaUnit}</span></div></label>
+            <label className="fx-field">
+              <span>
+                Farm area <small>(optional)</small>
+                <InfoTip title="Field Area" label="About field area" technicalNote="Used to assess satellite grid scale vs farm scale">
+                  The approximate size of your land. Helps Agrimetry calculate whether coarse satellite grids (~9 km) cover your field as a regional sample.
+                </InfoTip>
+              </span>
+              <div className="fx-input-suffix"><input type="number" min="0" step="0.1" value={farm.area} onChange={(event) => setFarm({ ...farm, area: event.target.value })} placeholder="e.g. 5" /><span>{farm.areaUnit}</span></div>
+            </label>
             <label className="fx-field"><span>Area unit</span><select value={farm.areaUnit} onChange={(event) => setFarm({ ...farm, areaUnit: event.target.value })}><option value="hectares">Hectares</option><option value="acres">Acres</option><option value="sqm">Square metres</option></select></label>
             <label className="fx-field"><span>Current crop</span><select value={farm.currentCrop} onChange={(event) => setFarm({ ...farm, currentCrop: event.target.value })}><option value="">Select current crop</option><option>Wheat</option><option>Rice</option><option>Maize</option><option>Millet</option><option>Sorghum</option><option>Soybean</option><option>Chickpea</option><option>Mustard</option><option>Cotton</option><option>Other / mixed</option></select></label>
             <label className="fx-field"><span>Previous crop <small>(optional)</small></span><select value={farm.previousCrop} onChange={(event) => setFarm({ ...farm, previousCrop: event.target.value })}><option value="">Select previous crop</option><option>Wheat</option><option>Rice</option><option>Maize</option><option>Millet</option><option>Sorghum</option><option>Soybean</option><option>Chickpea</option><option>Mustard</option><option>Cotton</option><option>Other / mixed</option></select></label>
@@ -238,6 +522,8 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
         <div className="fx-source-card">
           <div className="fx-source-card-head"><span className="fx-overline">DATA LAYERS</span><span className="fx-live-pill"><i /> READY TO CONNECT</span></div>
           <div className="fx-layer-row fx-layer-active"><span className="fx-layer-icon"><Icon name="sun" /></span><span><strong>NASA POWER</strong><small>Daily temperature, rainfall, humidity, solar</small></span><span className="fx-layer-status">LIVE</span></div>
+          <div className="fx-layer-row fx-layer-active"><span className="fx-layer-icon"><Icon name="leaf" /></span><span><strong>Copernicus Sentinel-2</strong><small>10 m NDVI surface reflectance &amp; SCL</small></span><span className="fx-layer-status">LIVE</span></div>
+          <div className="fx-layer-row fx-layer-active"><span className="fx-layer-icon"><Icon name="droplet" /></span><span><strong>NASA SMAP &amp; GPM</strong><small>Soil moisture, IMERG precipitation &amp; ET₀</small></span><span className="fx-layer-status">LIVE</span></div>
           {NEXT_LAYERS.map((layer) => <div className="fx-layer-row" key={layer.code}><span className="fx-layer-icon"><Icon name={layer.icon} /></span><span><strong>{layer.code} · {layer.title}</strong><small>{layer.detail}</small></span><span className="fx-layer-next">NEXT</span></div>)}
           <div className="fx-source-card-foot">NASA Earth observations + local farm context</div>
         </div>
@@ -248,34 +534,74 @@ function SetupScreen({ farm, setFarm, onAnalyze, loading, error, onSearch, searc
   );
 }
 
-function Dashboard({ farm, result, onEdit }) {
+function EnvironmentView({ farm, result, loading, error, onAnalyze, onEdit, savedFields, onSelectSavedField, onLoadBenchmark, mounted = false }) {
+  const selected = mounted && hasValidCoordinates(farm);
+  if (!selected) {
+    return (
+      <NoFieldPrompt
+        featureName="Environmental Baseline Data"
+        onSelectBenchmark={onLoadBenchmark}
+        onGoToOverview={onEdit}
+        savedFields={mounted ? savedFields : []}
+        onSelectSavedField={onSelectSavedField}
+      />
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="fx-dashboard">
+        <ActiveFieldStrip farm={farm} onEdit={onEdit} savedFields={savedFields} onSelectSavedField={onSelectSavedField} />
+
+        <div className="fx-field-prompt-card" style={{ marginTop: '24px' }}>
+          <div className="fx-prompt-head">
+            <div className="fx-prompt-icon"><Icon name="compass" size={24} /></div>
+            <div>
+              <h3>NASA POWER Climate Fingerprint</h3>
+              <p>
+                Retrieve 365-day meteorological daily observations for {farm.name || 'this location'} ({Number(farm.latitude).toFixed(4)}°, {Number(farm.longitude).toFixed(4)}°).
+                Assembles mean temperature, total precipitation, solar radiation, humidity, and 12-month seasonal rhythm.
+              </p>
+            </div>
+          </div>
+
+          {error && <div className="fx-error-box" style={{ marginBottom: '16px' }}><Icon name="info" size={17} /><span>{error}</span></div>}
+
+          <div className="fx-prompt-actions">
+            <button type="button" className="fx-prompt-btn-primary" onClick={onAnalyze} disabled={loading}>
+              {loading ? <><span className="fx-spinner fx-spinner-light" /> Fetching NASA POWER daily data…</> : <><Icon name="sun" size={15} /> Build Climate Fingerprint</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const summary = result.summary || {};
   const comparison = result.comparison || {};
-  const bestRainMonth = useMemo(() => {
-    const valid = (result.monthly || []).filter((item) => Number.isFinite(item.precipitation));
-    return valid.reduce((best, item) => (!best || item.precipitation > best.precipitation ? item : best), null);
-  }, [result.monthly]);
+  const bestRainMonth = (result.monthly || []).filter((item) => Number.isFinite(item.precipitation))
+    .reduce((best, item) => (!best || item.precipitation > best.precipitation ? item : best), null);
   const rainfallChange = comparison.rainfallChangePercent;
   const tempDelta = comparison.temperatureDelta;
 
   return (
     <div className="fx-dashboard">
       <div className="fx-dashboard-heading">
-        <div><div className="fx-page-kicker"><span className="fx-kicker-dot" /> ENVIRONMENTAL FINGERPRINT</div><h1 className="fx-page-title">A closer look at <em>{farm.name || 'your land'}.</em></h1><p className="fx-page-intro">A two-year environmental record, condensed into a field-context report. Start with the patterns; then validate what matters on the ground.</p></div>
+        <div>
+          <div className="fx-page-kicker"><span className="fx-kicker-dot" /> ENVIRONMENTAL FINGERPRINT</div>
+          <h1 className="fx-page-title">A closer look at <em>{farm.name || 'your land'}.</em></h1>
+          <p className="fx-page-intro">A two-year environmental record, condensed into a field-context report. Start with the patterns; then validate what matters on the ground.</p>
+        </div>
         <button className="fx-outline-button" onClick={onEdit}><Icon name="map" size={16} /> Edit farm profile</button>
       </div>
 
-      <div className="fx-context-strip">
-        <div className="fx-context-pin"><Icon name="pin" size={17} /></div>
-        <div className="fx-context-location"><strong>{farm.location || 'Selected location'}</strong><span>{Number(farm.latitude).toFixed(4)}°, {Number(farm.longitude).toFixed(4)}° · {farm.area ? `${farm.area} ${farm.areaUnit}` : 'Area not provided'}</span></div>
-        <div className="fx-context-divider" />
-        <div className="fx-context-detail"><small>CURRENT CROP</small><strong>{farm.currentCrop || 'Not specified'}</strong></div>
-        <div className="fx-context-detail"><small>WATER ACCESS</small><strong>{farm.irrigation || 'Not specified'}</strong></div>
-        <div className="fx-data-stamp"><span className="fx-live-pill"><i /> LIVE DATA</span><small>NASA POWER · refreshed {new Date(result.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small></div>
-      </div>
+      <ActiveFieldStrip farm={farm} onEdit={onEdit} savedFields={savedFields} onSelectSavedField={onSelectSavedField} />
 
-      <section className="fx-metric-section">
-        <div className="fx-section-heading"><div><span className="fx-overline">01 / CLIMATE BASELINE</span><h2>The atmosphere around your field</h2></div><span className="fx-period"><Icon name="calendar" size={14} /> {formatDate(result.period.currentStart)} — {formatDate(result.period.end)}</span></div>
+      <section className="fx-metric-section" id="fx-environment" style={{ marginTop: '24px' }}>
+        <div className="fx-section-heading">
+          <div><span className="fx-overline">01 / CLIMATE BASELINE</span><h2>The atmosphere around your field</h2></div>
+          <span className="fx-period"><Icon name="calendar" size={14} /> {formatDate(result.period?.currentStart)} — {formatDate(result.period?.end)}</span>
+        </div>
         <div className="fx-metric-grid">
           <MetricCard icon="thermometer" label="Mean air temperature" value={formatMetric(summary.meanTemperature)} unit="°C" note="Daily mean · latest 365 days" accent="sand" />
           <MetricCard icon="rain" label="Total precipitation" value={formatMetric(summary.precipitationTotal, 0)} unit="mm" note="Daily precipitation accumulation" accent="blue" />
@@ -287,7 +613,7 @@ function Dashboard({ farm, result, onEdit }) {
 
       <div className="fx-analysis-grid">
         <section className="fx-panel fx-chart-panel">
-          <div className="fx-panel-heading"><div><span className="fx-overline">02 / SEASONAL RHYTHM</span><h2>Rainfall & temperature</h2><p>How the last twelve months moved through the seasons.</p></div><span className="fx-panel-icon"><Icon name="chart" size={20} /></span></div>
+          <div className="fx-panel-heading"><div><span className="fx-overline">02 / SEASONAL RHYTHM</span><h2>Rainfall &amp; temperature</h2><p>How the last twelve months moved through the seasons.</p></div><span className="fx-panel-icon"><Icon name="chart" size={20} /></span></div>
           <MonthlyChart data={result.monthly || []} />
           <div className="fx-chart-insight"><span className="fx-insight-mark"><Icon name="sprout" size={17} /></span><p>{bestRainMonth ? `The highest precipitation total in the displayed period was ${formatMetric(bestRainMonth.precipitation, 1)} mm in ${new Date(`${bestRainMonth.month}-01T00:00:00Z`).toLocaleDateString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}.` : 'Monthly rainfall values are not available for this period.'} Use this as a seasonal signal, not a planting recommendation.</p></div>
         </section>
@@ -301,51 +627,273 @@ function Dashboard({ farm, result, onEdit }) {
         </section>
       </div>
 
-      <section className="fx-layers-section" id="fx-roadmap">
-        <div className="fx-section-heading"><div><span className="fx-overline">04 / EXPANDING THE FINGERPRINT</span><h2>More layers. A fuller picture.</h2></div><span className="fx-coming-label">INTEGRATION ROADMAP</span></div>
-        <div className="fx-next-grid">
-          {NEXT_LAYERS.map((layer, index) => <article className="fx-next-card" key={layer.code}><div className="fx-next-top"><span className="fx-next-icon"><Icon name={layer.icon} size={20} /></span><span>0{index + 2}</span></div><span className="fx-next-code">NASA {layer.code}</span><h3>{layer.title}</h3><p>{layer.detail}. This layer will add another independent environmental signal to the fingerprint.</p><span className="fx-roadmap-status"><i /> Planned integration</span></article>)}
-        </div>
-      </section>
-
-      <section className="fx-farm-context-panel">
-        <div className="fx-farm-context-copy"><span className="fx-overline">YOUR FARM CONTEXT</span><h2>Environmental data is only one part of the story.</h2><p>Your crop history, soil information, irrigation access and priorities will help Agrimetry compare rotation strategies responsibly. The next step is to connect these details to crop-specific requirements.</p><button className="fx-primary-button" onClick={onEdit}>Review farm details <Icon name="arrow" size={17} /></button></div>
-        <div className="fx-farm-details-grid">
-          <div><small>PREVIOUS CROP</small><strong>{farm.previousCrop || 'Not supplied'}</strong></div>
-          <div><small>SOIL TYPE</small><strong>{farm.soilType || 'Not supplied'}</strong></div>
-          <div><small>GROWING SEASON</small><strong>{farm.season || 'Not supplied'}</strong></div>
-          <div><small>FARMER PRIORITIES</small><strong>{farm.priorities.length ? farm.priorities.map((id) => PRIORITY_OPTIONS.find((item) => item.id === id)?.label).filter(Boolean).join(' · ') : 'Not supplied'}</strong></div>
-        </div>
-      </section>
-
-      <div className="fx-source-footer"><span><i className="fx-source-dot" /> SOURCE: NASA POWER DAILY POINT API</span><span>Fetched {new Date(result.fetchedAt).toLocaleString()}</span><a href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noreferrer">Data documentation <Icon name="external" size={12} /></a></div>
+      <div className="fx-source-footer">
+        <span><i className="fx-source-dot" /> SOURCE: NASA POWER DAILY POINT API</span>
+        <span>Fetched {result.fetchedAt ? new Date(result.fetchedAt).toLocaleString() : 'recently'}</span>
+        <a href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noreferrer">Data documentation <Icon name="external" size={12} /></a>
+      </div>
     </div>
   );
 }
 
-export default function FarmExplorer() {
-  const [farm, setFarm] = useState({
-    name: 'My field',
-    locationQuery: '',
-    location: '',
-    latitude: '',
-    longitude: '',
-    area: '',
-    areaUnit: 'hectares',
-    currentCrop: '',
-    previousCrop: '',
-    soilType: '',
-    irrigation: '',
-    season: '',
-    priorities: ['water', 'soil'],
-  });
+function VegetationView({ farm, onEdit, savedFields, onSelectSavedField, onLoadBenchmark, mounted = false }) {
+  const selected = mounted && hasValidCoordinates(farm);
+  if (!selected) {
+    return (
+      <NoFieldPrompt
+        featureName="Vegetation Intelligence (Copernicus Sentinel-2)"
+        onSelectBenchmark={onLoadBenchmark}
+        onGoToOverview={onEdit}
+        savedFields={mounted ? savedFields : []}
+        onSelectSavedField={onSelectSavedField}
+      />
+    );
+  }
+
+  return (
+    <div className="fx-dashboard">
+      <ActiveFieldStrip farm={farm} onEdit={onEdit} savedFields={savedFields} onSelectSavedField={onSelectSavedField} />
+      <VegetationIntelligence farm={farm} />
+    </div>
+  );
+}
+
+function WaterView({ farm, onEdit, savedFields, onSelectSavedField, onLoadBenchmark, mounted = false }) {
+  const selected = mounted && hasValidCoordinates(farm);
+  if (!selected) {
+    return (
+      <NoFieldPrompt
+        featureName="Soil Moisture & Water Stress (NASA SMAP & IMERG)"
+        onSelectBenchmark={onLoadBenchmark}
+        onGoToOverview={onEdit}
+        savedFields={mounted ? savedFields : []}
+        onSelectSavedField={onSelectSavedField}
+      />
+    );
+  }
+
+  return (
+    <div className="fx-dashboard">
+      <ActiveFieldStrip farm={farm} onEdit={onEdit} savedFields={savedFields} onSelectSavedField={onSelectSavedField} />
+      <WaterStressIntelligence farm={farm} />
+    </div>
+  );
+}
+
+function RoadmapView({ featureId, farm, onBack }) {
+  const isRotation = featureId === 'rotation';
+  const title = isRotation ? 'Crop Rotation Explorer' : 'Multi-Decadal Climate Replay';
+  const code = isRotation ? 'PLANNED INTEGRATION · FEATURE 3' : 'PLANNED INTEGRATION · FEATURE 4';
+
+  return (
+    <div className="fx-dashboard">
+      {hasValidCoordinates(farm) && <ActiveFieldStrip farm={farm} onEdit={onBack} />}
+      <div className="fx-roadmap-feature-card">
+        <span className="fx-roadmap-badge">{code}</span>
+        <h2 style={{ fontSize: '24px', color: '#173d2b', marginBottom: '10px' }}>{title}</h2>
+        <p style={{ color: '#5d5547', lineHeight: 1.6, fontSize: '14px', maxWidth: '680px' }}>
+          {isRotation
+            ? 'The Crop Rotation Intelligence engine will synthesize field vegetation indices (Sentinel-2), root-zone soil moisture percentiles (SMAP), and historical climatological regimes (NASA POWER) to recommend optimal crop sequences, nitrogen-fixing legume intervals, and moisture-conserving rotations.'
+            : 'Climate Replay provides multi-decadal historical climate distributions, extreme weather event frequencies, and seasonal shift analytics using 30-meter Landsat archives and gridded reanalysis models.'}
+        </p>
+
+        <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #e7ded2', display: 'flex', gap: '12px' }}>
+          <button type="button" className="fx-prompt-btn-secondary" onClick={onBack}>
+            <Icon name="arrow" size={14} /> Back to Farm Overview
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const emptySubscribe = () => () => {};
+
+function useMounted() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
+function subscribeToStorage(callback) {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener('storage', callback);
+  window.addEventListener('agrimetry:storage', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener('agrimetry:storage', callback);
+  };
+}
+
+function getSavedFieldsSnapshot() {
+  try {
+    return localStorage.getItem('agrimetry:global-farm-map:v1') || '';
+  } catch {
+    return '';
+  }
+}
+
+function getServerEmptyString() {
+  return '';
+}
+
+export default function FarmExplorer({ initialView }) {
+  // Flag indicating client has completed hydration mounting
+  const mounted = useMounted();
+
+  // Pure initial state matching SSR byte-for-byte
+  const [activeNav, setActiveNav] = useState(() => initialView ? resolveActiveView(initialView) : 'overview');
+  const savedFieldsRaw = useSyncExternalStore(subscribeToStorage, getSavedFieldsSnapshot, getServerEmptyString);
+  const savedFields = useMemo(() => {
+    if (!savedFieldsRaw) return [];
+    try {
+      const parsed = JSON.parse(savedFieldsRaw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [savedFieldsRaw]);
+
+  const [farm, setFarm] = useState(DEFAULT_FARM);
+
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
-  const [activeNav, setActiveNav] = useState('overview');
+
+  // Synchronize browser history / URL query parameter
+  const updateUrlView = useCallback((newView) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', newView);
+      window.history.pushState({ view: newView }, '', url.toString());
+    } catch {
+      // ignore history errors
+    }
+  }, []);
+
+  // Listen to browser Back/Forward events
+  useEffect(() => {
+    function handlePopState(event) {
+      if (event.state?.view) {
+        setActiveNav(resolveActiveView(event.state.view));
+      } else if (typeof window !== 'undefined' && window.location.search) {
+        const sp = new URLSearchParams(window.location.search);
+        const v = sp.get('view');
+        setActiveNav(resolveActiveView(v));
+      }
+    }
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Hydrate client-only storage and URL search parameters after initial render (avoids SSR hydration mismatch)
+  useEffect(() => {
+    // Resolve active farm from URL query params or localStorage
+    let resolved = { ...DEFAULT_FARM };
+    let hasUrlParams = false;
+
+    if (typeof window !== 'undefined' && window.location.search) {
+      try {
+        const fromUrl = parseFarmFromUrl(window.location.search, DEFAULT_FARM);
+        if (hasValidCoordinates(fromUrl)) {
+          resolved = fromUrl;
+          hasUrlParams = true;
+        }
+      } catch (err) {
+        console.warn('Could not parse URL query parameters:', err);
+      }
+    }
+
+    if (!hasUrlParams && typeof window !== 'undefined') {
+      try {
+        const storedActive = localStorage.getItem('agrimetry:active-farm:v1');
+        if (storedActive) {
+          resolved = deserializeActiveFarm(storedActive, resolved);
+        }
+      } catch (err) {
+        console.warn('Could not restore active farm from localStorage:', err);
+      }
+    }
+
+    // Restore asynchronously on mount to avoid synchronous cascading renders
+    const timer = setTimeout(() => {
+      setFarm(resolved);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialView]);
+
+  // Persist active farm to localStorage after hydration
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    if (hasValidCoordinates(farm)) {
+      try {
+        const serialized = serializeActiveFarm(farm);
+        if (serialized) {
+          localStorage.setItem('agrimetry:active-farm:v1', serialized);
+        }
+      } catch (err) {
+        console.warn('Could not save active farm to localStorage:', err);
+      }
+    }
+  }, [farm, mounted]);
+
+  function handleNavClick(id) {
+    const valid = resolveActiveView(id);
+    setActiveNav(valid);
+    updateUrlView(valid);
+  }
+
+  function handleSelectSavedField(feature) {
+    if (!feature) return;
+    const ring = feature.geometry?.coordinates?.[0] || [];
+    const pt = ring[0] || [0, 0];
+    const fieldName = feature.properties?.fieldName || feature.properties?.name || 'Selected field';
+
+    let centroidLng = pt[0];
+    let centroidLat = pt[1];
+    if (ring.length > 1) {
+      let sumLng = 0;
+      let sumLat = 0;
+      const n = ring.length - (ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        sumLng += ring[i][0];
+        sumLat += ring[i][1];
+      }
+      if (n > 0) {
+        centroidLng = Number((sumLng / n).toFixed(6));
+        centroidLat = Number((sumLat / n).toFixed(6));
+      }
+    }
+
+    let areaHa = '';
+    try {
+      const sqM = calculateArea(feature);
+      if (sqM > 0) areaHa = (sqM / 10000).toFixed(2);
+    } catch {
+      if (feature.properties?.areaSquareMetres) {
+        areaHa = (feature.properties.areaSquareMetres / 10000).toFixed(2);
+      }
+    }
+
+    setFarm((curr) => ({
+      ...curr,
+      name: fieldName,
+      location: `${fieldName} (Global Farm Map)`,
+      locationQuery: fieldName,
+      latitude: String(centroidLat),
+      longitude: String(centroidLng),
+      area: areaHa || curr.area,
+      areaUnit: 'hectares',
+      geometry: feature.geometry,
+      fieldId: String(feature.id || feature.properties?.candidateId || `field-${Date.now()}`),
+    }));
+  }
+
+  function handleLoadBenchmark() {
+    setFarm({ ...BENCHMARK_FARM });
+  }
 
   async function handleSearch() {
     setSearchError('');
@@ -378,6 +926,8 @@ export default function FarmExplorer() {
       location: place.label,
       latitude: String(place.latitude),
       longitude: String(place.longitude),
+      geometry: null,
+      fieldId: null,
     }));
     setSearchResults([]);
     setSearchError('');
@@ -399,6 +949,8 @@ export default function FarmExplorer() {
           locationQuery: 'Current device location',
           latitude: String(latitude),
           longitude: String(longitude),
+          geometry: null,
+          fieldId: null,
         }));
         setSearchResults([]);
       },
@@ -408,38 +960,28 @@ export default function FarmExplorer() {
   }
 
   async function handleAnalyze(event) {
-    event.preventDefault();
+    if (event && event.preventDefault) event.preventDefault();
     setError('');
     const latitude = Number(farm.latitude);
     const longitude = Number(farm.longitude);
-    if (farm.latitude === '' || farm.longitude === '' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    if (!hasValidCoordinates(farm)) {
       setError('Choose a location or enter valid coordinates before analysing your farm.');
       return;
     }
 
     setLoading(true);
-    setResult(null);
     try {
       const response = await fetch(`/api/environment?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Environmental data could not be retrieved.');
       setResult(payload);
       setActiveNav('environment');
+      updateUrlView('environment');
     } catch (analysisException) {
       setError(analysisException.message || 'Unable to build the environmental fingerprint. Please try again.');
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleNavClick(id) {
-    if (id === 'overview' || id === 'environment') {
-      setActiveNav(id);
-      if (id === 'overview' && result) setResult(null);
-      return;
-    }
-    setActiveNav(id);
-    document.getElementById('fx-roadmap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   return (
@@ -448,11 +990,61 @@ export default function FarmExplorer() {
         <BrandMark light />
         <div className="fx-workspace-label">WORKSPACE</div>
         <nav className="fx-nav" aria-label="Application navigation">
-          <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}><Icon name="grid" size={17} /><span>Farm overview</span></button>
-          <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}><Icon name="compass" size={17} /><span>Environmental data</span>{result && <i className="fx-nav-live" />}</button>
-          <Link href="/explore/map" className="fx-nav-map-link"><Icon name="map" size={17} /><span>Global farm map</span><em>NEW</em></Link>
-          <button onClick={() => handleNavClick('rotation')}><Icon name="sprout" size={17} /><span>Rotation explorer</span><em>SOON</em></button>
-          <button onClick={() => handleNavClick('climate')}><Icon name="calendar" size={17} /><span>Climate replay</span><em>SOON</em></button>
+          <button className={activeNav === 'overview' ? 'is-active' : ''} onClick={() => handleNavClick('overview')}>
+            <Icon name="grid" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Farm overview</span>
+              <small className="fx-nav-sub">Manage your farm and selected fields</small>
+            </div>
+          </button>
+          <button className={activeNav === 'environment' ? 'is-active' : ''} onClick={() => handleNavClick('environment')}>
+            <Icon name="compass" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Environmental data</span>
+              <small className="fx-nav-sub">Explore local weather and climate conditions</small>
+            </div>
+            {result && <i className="fx-nav-live" />}
+          </button>
+          <button className={activeNav === 'vegetation' ? 'is-active' : ''} onClick={() => handleNavClick('vegetation')}>
+            <Icon name="leaf" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Vegetation intelligence</span>
+              <small className="fx-nav-sub">See how healthy and green your crops are</small>
+            </div>
+            <em className="fx-nav-badge-live">S2 L2A</em>
+          </button>
+          <button className={activeNav === 'water' ? 'is-active' : ''} onClick={() => handleNavClick('water')}>
+            <Icon name="droplet" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Soil moisture &amp; water</span>
+              <small className="fx-nav-sub">Understand soil moisture, rainfall and water stress</small>
+            </div>
+            <em className="fx-nav-badge-live">SMAP</em>
+          </button>
+          <Link href="/explore/map" className="fx-nav-map-link">
+            <Icon name="map" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Global farm map</span>
+              <small className="fx-nav-sub">Find and explore agricultural land</small>
+            </div>
+            <em>MAP</em>
+          </Link>
+          <button className={activeNav === 'rotation' ? 'is-active' : ''} onClick={() => handleNavClick('rotation')}>
+            <Icon name="sprout" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Rotation explorer</span>
+              <small className="fx-nav-sub">Optimal crop sequences (Upcoming)</small>
+            </div>
+            <em>SOON</em>
+          </button>
+          <button className={activeNav === 'climate' ? 'is-active' : ''} onClick={() => handleNavClick('climate')}>
+            <Icon name="calendar" size={17} />
+            <div className="fx-nav-text">
+              <span className="fx-nav-title">Climate replay</span>
+              <small className="fx-nav-sub">Historical climate distributions (Upcoming)</small>
+            </div>
+            <em>SOON</em>
+          </button>
         </nav>
         <div className="fx-sidebar-bottom">
           <div className="fx-side-earth"><div className="fx-earth-orbit"><span /></div><span>EARTH DATA, MADE USEFUL.</span></div>
@@ -463,12 +1055,19 @@ export default function FarmExplorer() {
 
       <div className="fx-main-area">
         <header className="fx-topbar">
-          <div className="fx-breadcrumb"><span>AGRIMETRY</span><Icon name="chevron" size={13} /><strong>{result ? 'Environmental data' : 'Farm overview'}</strong></div>
-          <div className="fx-topbar-right"><span className="fx-topbar-status"><i /> POWER API READY</span><span className="fx-avatar">A</span></div>
+          <div className="fx-breadcrumb">
+            <span>AGRIMETRY</span>
+            <Icon name="chevron" size={13} />
+            <strong>{VIEW_TITLES[activeNav] || 'Farm overview'}</strong>
+          </div>
+          <div className="fx-topbar-right">
+            <span className="fx-topbar-status"><i /> SATELLITE READY</span>
+            <span className="fx-avatar">A</span>
+          </div>
         </header>
 
         <div className="fx-content-wrap">
-          {!result ? (
+          {activeNav === 'overview' && (
             <SetupScreen
               farm={farm}
               setFarm={setFarm}
@@ -481,14 +1080,64 @@ export default function FarmExplorer() {
               searchError={searchError}
               onSelectLocation={selectLocation}
               onUseLocation={useCurrentLocation}
+              savedFields={savedFields}
+              onSelectSavedField={handleSelectSavedField}
+              onNavigateToView={handleNavClick}
+              onLoadBenchmark={handleLoadBenchmark}
+              mounted={mounted}
             />
-          ) : (
-            <Dashboard farm={farm} result={result} onEdit={() => { setResult(null); setActiveNav('overview'); }} />
+          )}
+
+          {activeNav === 'environment' && (
+            <EnvironmentView
+              farm={farm}
+              result={result}
+              loading={loading}
+              error={error}
+              onAnalyze={handleAnalyze}
+              onEdit={() => handleNavClick('overview')}
+              savedFields={savedFields}
+              onSelectSavedField={handleSelectSavedField}
+              onLoadBenchmark={handleLoadBenchmark}
+              mounted={mounted}
+            />
+          )}
+
+          {activeNav === 'vegetation' && (
+            <VegetationView
+              farm={farm}
+              onEdit={() => handleNavClick('overview')}
+              savedFields={savedFields}
+              onSelectSavedField={handleSelectSavedField}
+              onLoadBenchmark={handleLoadBenchmark}
+              mounted={mounted}
+            />
+          )}
+
+          {activeNav === 'water' && (
+            <WaterView
+              farm={farm}
+              onEdit={() => handleNavClick('overview')}
+              savedFields={savedFields}
+              onSelectSavedField={handleSelectSavedField}
+              onLoadBenchmark={handleLoadBenchmark}
+              mounted={mounted}
+            />
+          )}
+
+          {(activeNav === 'rotation' || activeNav === 'climate') && (
+            <RoadmapView
+              featureId={activeNav}
+              farm={farm}
+              onBack={() => handleNavClick('overview')}
+            />
           )}
         </div>
-        <footer className="fx-app-footer"><span>AGRIMETRY <i>·</i> EARTH OBSERVATION FOR RESILIENT FARMING</span><span>Environmental estimates support decisions; they do not replace local expertise.</span></footer>
+        <footer className="fx-app-footer">
+          <span>AGRIMETRY <i>·</i> EARTH OBSERVATION FOR RESILIENT FARMING</span>
+          <span>Environmental estimates support decisions; they do not replace local expertise.</span>
+        </footer>
       </div>
     </main>
   );
 }
-

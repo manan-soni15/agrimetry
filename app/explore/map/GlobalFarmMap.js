@@ -731,7 +731,43 @@ export default function GlobalFarmMap() {
             <div className="agm-fields-heading"><div className="agm-section-label"><span>03</span><h2>Saved fields</h2></div><button type="button" onClick={addDemoField} disabled={!mapReady} title="Add a sample boundary">+ Sample</button></div>
             {fields.length ? <div className="agm-field-list">{fields.map((feature, index) => {
               const fieldArea = featureArea(feature);
-              return <button className="agm-field-item" type="button" key={feature.id || `${index}-${fieldArea}`} onClick={() => focusField(feature)}><span className="agm-field-swatch">{String(index + 1).padStart(2, "0")}</span><span className="agm-field-meta"><strong>{feature.properties?.fieldName || feature.properties?.name || `Field ${index + 1}`}</strong><small>{formatArea(fieldArea)}</small></span><Icon name="arrow" size={15}/></button>;
+              const ring = feature.geometry?.coordinates?.[0] || [];
+              const pt = ring[0] || [0, 0];
+              const fieldName = feature.properties?.fieldName || feature.properties?.name || `Field ${index + 1}`;
+              const analyzeUrl = `/explore?fieldId=${encodeURIComponent(feature.id || `field-${index}`)}&lat=${pt[1].toFixed(4)}&lon=${pt[0].toFixed(4)}&area=${(fieldArea / 10000).toFixed(2)}&name=${encodeURIComponent(fieldName)}`;
+
+              return (
+                <div key={feature.id || `${index}-${fieldArea}`} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button className="agm-field-item" type="button" style={{ flex: 1 }} onClick={() => focusField(feature)}>
+                    <span className="agm-field-swatch">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="agm-field-meta"><strong>{fieldName}</strong><small>{formatArea(fieldArea)}</small></span>
+                    <Icon name="arrow" size={15}/>
+                  </button>
+                  <Link
+                    href={analyzeUrl}
+                    title="Analyze vegetation & climate in Farm Explorer"
+                    style={{
+                      minHeight: 38,
+                      padding: "0 10px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      background: "#244f38",
+                      color: "#fbf9f3",
+                      borderRadius: 7,
+                      textDecoration: "none",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: ".04em",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name="leaf" size={13} />
+                    <span>Analyze</span>
+                  </Link>
+                </div>
+              );
             })}</div> : <div className="agm-empty-fields"><span><Icon name="polygon" size={18}/></span><p>No field boundaries yet.</p><small>Choose Trace points or Freehand to outline an irregular field.</small></div>}
             <button type="button" className="agm-clear-button" onClick={clearBoundaries} disabled={!fields.length}><Icon name="trash" size={14}/> Clear all boundaries</button>
           </section>

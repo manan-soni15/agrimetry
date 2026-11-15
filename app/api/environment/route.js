@@ -70,8 +70,18 @@ function buildMonthly(records) {
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const latitude = Number(searchParams.get("lat"));
-  const longitude = Number(searchParams.get("lon"));
+  const latStr = searchParams.get("lat");
+  const lonStr = searchParams.get("lon");
+
+  if (!latStr || !lonStr) {
+    return Response.json(
+      { error: "Provide valid latitude and longitude values." },
+      { status: 400 },
+    );
+  }
+
+  const latitude = Number(latStr);
+  const longitude = Number(lonStr);
 
   if (
     !Number.isFinite(latitude) ||

@@ -110,7 +110,7 @@ function PassportEntry({ entry, passport, active }) {
         <p className="pp-lead">{passport.climate.startYear}–{passport.climate.endYear}: about {Math.round(passport.climate.annualRainMm)} mm rain a year{passport.climate.aridity ? `, ${passport.climate.aridity.toLowerCase()} climate` : ""}, coldest month averaging {passport.climate.coldestMonthC.toFixed(0)} °C. Each crop season of this rotation was replayed against every past year of NASA POWER weather.</p>
         <div className="pp-stats"><div><span>Seasons replayed</span><strong>{h.seasonsAnalysed}</strong></div><div><span>Favourable</span><strong>{pct(h.favourableShare)}</strong></div><div><span>Unfavourable</span><strong>{pct(h.unfavourableShare)}</strong></div><div><span>Widespread bad years</span><strong>{h.badYears.length}{h.badYears.length ? <small> ({h.badYears.slice(0, 6).join(", ")}{h.badYears.length > 6 ? "…" : ""})</small> : ""}</strong></div></div>
         {h.worstCrop && <p className="pp-lead">Weakest crop in this rotation: <strong>{h.worstCrop.name}</strong>, unfavourable in {pct(h.worstCrop.unfavourableShare)} of past seasons.</p>}
-        <div className="vi-table-scroll"><table><thead><tr><th>Scenario applied to all 25 years</th><th>Not favourable</th><th>Average match</th><th>Bad years</th></tr></thead><tbody>{entry.history.scenarios.map((c) => <tr key={c.key}><td>{scenarioLabel(c.key)}</td><td>{pct(c.notFavourableShare)}</td><td>{Math.round(c.meanFit * 100)}%</td><td>{c.badYears}</td></tr>)}</tbody></table></div>
+        <div className="vi-table-scroll"><table><thead><tr><th>Scenario applied to all </th><th>Not favourable</th><th>Average match</th><th>Bad years</th></tr></thead><tbody>{entry.history.scenarios.map((c) => <tr key={c.key}><td>{scenarioLabel(c.key)}</td><td>{pct(c.notFavourableShare)}</td><td>{Math.round(c.meanFit * 100)}%</td><td>{c.badYears}</td></tr>)}</tbody></table></div>
       </section>
 
       <section className="pp-section">
@@ -254,7 +254,7 @@ export default function PassportIntelligence() {
   }
 
   const sourceRows = [
-    ["climate", "NASA POWER climate history (25 years)"],
+    ["climate", "NASA POWER climate history"],
     ["water", "NASA POWER water-stress analysis"],
     ["soil", "Soil profile + NASA SMAP water history"],
     ["vegetation", "Sentinel-2 vegetation of your field (can take up to 2 minutes)"],
@@ -277,7 +277,7 @@ export default function PassportIntelligence() {
           <div>
             <span className="vi-kicker"><span/> EVIDENCE PASSPORT</span>
             <h1>Every suggestion, with its <em>evidence</em>.</h1>
-            <p>The passport gathers everything Agrimetry knows about your field and shows, for each rotation, why it was suggested, which datasets support it, what 25 years of weather would have done to it, the potential soil and water effects, and every risk, uncertainty and gap. It keeps satellite observations, modelled estimates and your own information clearly apart.</p>
+            <p>The passport gathers everything Agrimetry knows about your field and shows, for each rotation, why it was suggested, which datasets support it, what years of weather would have done to it, the potential soil and water effects, and every risk, uncertainty and gap. It keeps satellite observations, modelled estimates and your own information clearly apart.</p>
           </div>
           <div className="vi-intro-note"><Icon name="shield" size={20}/><span>Printable · downloadable<br/><strong>Always ends with: validate locally</strong></span></div>
         </section>

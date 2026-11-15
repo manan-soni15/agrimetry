@@ -162,7 +162,7 @@ export default function RotationIntelligence() {
     setError("");
     setResult(null);
     try {
-      setStage("Loading 25 years of climate for your field…");
+      setStage("Loading years of climate for your field…");
       const [climate, soilInfo] = await Promise.all([loadClimate(centre), useSoil ? loadSoil() : Promise.resolve({ soil: null, note: null })]);
       setStage("Scoring thousands of crop sequences…");
       await new Promise((resolve) => setTimeout(resolve, 30));

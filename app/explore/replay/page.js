@@ -8,7 +8,7 @@ import ReplayIntelligence from "./ReplayIntelligence";
 
 export const metadata = {
   title: "Historical Climate Replay | Agrimetry",
-  description: "Replay crop rotations against 25 years of real rainfall and temperature, see which seasons were unfavourable, and test drier or warmer scenarios.",
+  description: "Replay crop rotations against years of real rainfall and temperature, see which seasons were unfavourable, and test drier or warmer scenarios.",
 };
 
 export default function ReplayPage() {

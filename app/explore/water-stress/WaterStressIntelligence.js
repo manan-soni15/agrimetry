@@ -388,7 +388,7 @@ export default function WaterStressIntelligence() {
             </aside>
 
             <section className="vi-results-area">
-              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS READING NASA DATA</span><h2>Comparing this period with 25 years of history</h2></div></div><p className="vi-progress-detail">Fetching daily soil wetness, rainfall and temperature, and the long-term monthly record for your field&apos;s grid cell. This usually takes a few seconds.</p><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
+              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS READING NASA DATA</span><h2>Comparing this period with years of history</h2></div></div><p className="vi-progress-detail">Fetching daily soil wetness, rainfall and temperature, and the long-term monthly record for your field&apos;s grid cell. This usually takes a few seconds.</p><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
 
               <div className="vi-map-card">
                 <div className="vi-map-card-head">

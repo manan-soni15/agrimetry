@@ -210,7 +210,7 @@ export default function ReplayIntelligence() {
           <span className="vi-divider"/>
           <div className="vi-header-title"><small>DECISION SUPPORT</small><strong>Historical climate replay</strong></div>
         </div>
-        <div className="vi-header-actions"><span className="vi-source-pill"><i/> NASA POWER · 25 YEARS</span><Link href="/explore/rotation" className="vi-explore-link">Rotation engine</Link><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/passport" className="vi-explore-link">Evidence passport</Link></div>
+        <div className="vi-header-actions"><span className="vi-source-pill"><i/> NASA POWER · MANY YEARS</span><Link href="/explore/rotation" className="vi-explore-link">Rotation engine</Link><Link href="/explore/water-stress" className="vi-explore-link">Water stress</Link><Link href="/explore/passport" className="vi-explore-link">Evidence passport</Link></div>
       </header>
 
       <div className="vi-content">
@@ -220,7 +220,7 @@ export default function ReplayIntelligence() {
             <h1>How would these rotations have <em>fared</em> in the past?</h1>
             <p>Agrimetry replays each crop of a rotation against every year of real rainfall, temperature and soil wetness from 2001 onward, marks the seasons that were unfavourable, and lets you test drier or warmer futures. It shows how resilient each rotation is, not what yield it will give.</p>
           </div>
-          <div className="vi-intro-note"><Icon name="clock" size={20}/><span>{CROPS.length} crops · 25 years · what-if scenarios<br/><strong>Uses NASA POWER monthly data</strong></span></div>
+          <div className="vi-intro-note"><Icon name="clock" size={20}/><span>{CROPS.length} crops ·  years · what-if scenarios<br/><strong>Uses NASA POWER monthly data</strong></span></div>
         </section>
 
         {fields.length === 0 ? (
@@ -283,14 +283,14 @@ export default function ReplayIntelligence() {
                     <label className="ro-slider-row"><div><span>Rainfall change</span><strong>{scenario.rainPct > 0 ? "+" : ""}{scenario.rainPct}%</strong></div><input type="range" min="-50" max="30" step="5" value={scenario.rainPct} onChange={(event) => setScenario({ ...scenario, rainPct: Number(event.target.value) })}/></label>
                     <label className="ro-slider-row"><div><span>Warmer by</span><strong>+{scenario.tempDelta.toFixed(1)}°C</strong></div><input type="range" min="0" max="4" step="0.5" value={scenario.tempDelta} onChange={(event) => setScenario({ ...scenario, tempDelta: Number(event.target.value) })}/></label>
                   </div>
-                  <p className="rp-scenario-note">The change is applied to every month of all 25 years. It does not model changed rainfall patterns, extremes or crop adaptation.</p>
+                  <p className="rp-scenario-note">The change is applied to every month of all years. It does not model changed rainfall patterns, extremes or crop adaptation.</p>
                 </>
               )}
               <div className="vi-source-note"><Icon name="info" size={15}/><p>Seasons are rated from monthly climate and approximate crop values. A rating says how favourable the weather was, not what yield you would have had.</p></div>
             </aside>
 
             <section className="vi-results-area">
-              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS REPLAYING HISTORY</span><h2>Loading 25 years of climate</h2></div></div><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
+              {loading && <section className="vi-analysis-progress" role="status" aria-live="polite"><div className="vi-progress-head"><span className="vi-progress-orbit"><span/><i/></span><div><span className="vi-overline">AGRIMETRY IS REPLAYING HISTORY</span><h2>Loading years of climate</h2></div></div><div className="vi-progress-track" aria-hidden="true"><span/></div></section>}
 
               {!analysis ? (
                 !loading && <div className="vi-wait-panel"><span className="vi-wait-mark"><Icon name="clock" size={22}/></span><div><strong>Your climate replay will appear here.</strong><p>Choose rotations and replay history. You will see which past seasons were favourable or not for every crop, then can try drier or warmer scenarios.</p></div></div>
@@ -348,7 +348,7 @@ export default function ReplayIntelligence() {
                   </section>
 
                   <section className="vi-white-panel vi-observation-table">
-                    <div className="vi-panel-title"><div><span className="vi-overline">08 / CLIMATE SCENARIOS</span><h2>How each rotation responds to change</h2><p>Share of crop seasons that were not favourable, and average match, under each scenario applied to the same 25 years.</p></div></div>
+                    <div className="vi-panel-title"><div><span className="vi-overline">08 / CLIMATE SCENARIOS</span><h2>How each rotation responds to change</h2><p>Share of crop seasons that were not favourable, and average match, under each scenario applied to the same years.</p></div></div>
                     <div className="vi-table-scroll"><table className="rp-matrix"><thead><tr><th>Rotation</th>{analysis.presets.map((p) => <th key={p.key}>{p.label}</th>)}</tr></thead><tbody>
                       {analysis.matrix.map((row) => {
                         const baseCell = row.cells[0];

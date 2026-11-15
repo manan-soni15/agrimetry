@@ -4,6 +4,7 @@ import { getWaterSatelliteContext } from "@/lib/nasa/earth-observation";
 
 export const maxDuration = 60;
 
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const latitude = Number(searchParams.get("lat"));
@@ -30,7 +31,7 @@ export async function GET(request) {
       return {
         earthdataConfigured: Boolean(process.env.NASA_EARTHDATA_TOKEN?.trim()),
         gpm: { status: "unavailable", source: "NASA GPM IMERG Late Daily V07", resolutionKm: 10, monthly: [], reason },
-        ecostress: { status: "unavailable", source: "NASA ECOSTRESS ECO_L3G_JET V002", resolutionM: 70, observations: [], reason },
+        ecostress: { status: "unavailable", source: "NASA ECOSTRESS ECO_L3T_JET V002", resolutionM: 70, observations: [], reason },
       };
     });
     const [result, satelliteContext] = await Promise.all([

@@ -347,7 +347,7 @@ export default function WaterStressIntelligence() {
           <span className="vi-divider"/>
           <div className="vi-header-title"><small>FIELD INTELLIGENCE</small><strong>Soil moisture &amp; water stress</strong></div>
         </div>
-        <div className="vi-header-actions"><span className="vi-source-pill"><i/> NASA POWER · GPM · ECOSTRESS</span><Link href="/explore/vegetation" className="vi-explore-link">Vegetation</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore/map" className="vi-explore-link">Global farm map</Link></div>
+        <div className="vi-header-actions"><span className="vi-source-pill"><i/> NASA POWER · GPM</span><Link href="/explore/vegetation" className="vi-explore-link">Vegetation</Link><Link href="/explore/bare-field" className="vi-explore-link">Bare fields</Link><Link href="/explore/map" className="vi-explore-link">Global farm map</Link></div>
       </header>
 
       <div className="vi-content">
@@ -355,9 +355,9 @@ export default function WaterStressIntelligence() {
           <div>
             <span className="vi-kicker"><span/> SOIL MOISTURE AND WATER STRESS INTELLIGENCE</span>
             <h1>See when your field was <em>thirsty</em>.</h1>
-            <p>Agrimetry compares your field&apos;s recent rainfall, soil wetness and temperature with the same months over the past two decades, flags periods of declining soil moisture and builds a month-by-month water-stress timeline. GPM IMERG rainfall totals and ECOSTRESS daytime evapotranspiration add independent satellite context alongside the established climate analysis.</p>
+            <p>Agrimetry compares your field&apos;s recent rainfall, soil wetness and temperature with the same months over the past two decades, flags periods of declining soil moisture and builds a month-by-month water-stress timeline. GPM IMERG rainfall totals add independent satellite context alongside the established climate analysis.</p>
           </div>
-          <div className="vi-intro-note"><Icon name="drop" size={20}/><span>NASA POWER baseline · GPM IMERG · ECOSTRESS<br/><strong>NASA Earthdata token enables extra satellite series</strong></span></div>
+          <div className="vi-intro-note"><Icon name="drop" size={20}/><span>NASA POWER baseline · GPM IMERG<br/><strong>NASA Earthdata token enables extra satellite series</strong></span></div>
         </section>
 
         {fields.length === 0 ? (
@@ -384,7 +384,7 @@ export default function WaterStressIntelligence() {
               </label>
               <button type="button" className="vi-run-button" onClick={runAnalysis} disabled={loading || !selectedField}><Icon name={loading ? "refresh" : "drop"} size={17}/>{loading ? "Reading NASA data…" : "Run water-stress analysis"}</button>
               {error && <div className="vi-error" role="alert"><Icon name="info" size={17}/><span>{error}</span></div>}
-              <div className="vi-source-note"><Icon name="info" size={15}/><p>The established water-stress score uses NASA POWER (MERRA-2) estimates for the grid cell containing your field centre; they are not field measurements. GPM IMERG adds roughly 10 km precipitation estimates, while ECOSTRESS adds intermittent 70 m daytime ET observations when NASA Earthdata access is configured. These extra sources provide context and do not alter the POWER-derived score.</p></div>
+              <div className="vi-source-note"><Icon name="info" size={15}/><p>The established water-stress score uses NASA POWER (MERRA-2) estimates for the grid cell containing your field centre; they are not field measurements. GPM IMERG adds roughly 10 km precipitation estimates. This extra source provides context and do not alter the POWER-derived score.</p></div>
             </aside>
 
             <section className="vi-results-area">
@@ -428,7 +428,7 @@ export default function WaterStressIntelligence() {
                   </div>
 
                   <section className="vi-white-panel ws-earth-observations">
-                    <div className="vi-panel-title"><div><span className="vi-overline">03B / ADDITIONAL NASA SATELLITE EVIDENCE</span><h2>Rain from space, water leaving the land.</h2><p>Independent satellite context alongside the existing NASA POWER analysis. These observations do not change the POWER-based stress rating.</p></div></div>
+                    <div className="vi-panel-title"><div><span className="vi-overline">03B / ADDITIONAL NASA SATELLITE EVIDENCE</span><h2>Rain from space.</h2><p>Independent satellite context alongside the existing NASA POWER analysis. These observations do not change the POWER-based stress rating.</p></div></div>
                     <div className="ws-earth-grid">
                       <article className="ws-earth-card">
                         <div className="ws-earth-card-head"><div><span className="vi-overline">GPM IMERG · DAILY PRECIPITATION</span><h3>How much rain reached this region?</h3></div><span className={`ws-data-state ${satelliteContext?.gpm?.status === "available" ? "is-ready" : ""}`}>{satelliteContext?.gpm?.status === "available" ? "DATA FOUND" : satelliteContext?.gpm?.status === "needs_token" ? "TOKEN REQUIRED" : "UNAVAILABLE"}</span></div>
@@ -439,17 +439,8 @@ export default function WaterStressIntelligence() {
                         </> : <div className="ws-source-unavailable"><p>{satelliteContext?.gpm?.reason || "GPM IMERG observations were not available for this location and period."}</p>{satelliteContext?.gpm?.status === "needs_token" && <a href="https://urs.earthdata.nasa.gov/" target="_blank" rel="noreferrer">NASA Earthdata Login</a>}</div>}
                         {satelliteContext?.gpm?.note && <small className="vi-method-note">{satelliteContext.gpm.note}</small>}
                       </article>
-                      <article className="ws-earth-card">
-                        <div className="ws-earth-card-head"><div><span className="vi-overline">ECOSTRESS · EVAPOTRANSPIRATION</span><h3>How much water was released?</h3></div><span className={`ws-data-state ${satelliteContext?.ecostress?.status === "available" ? "is-ready" : ""}`}>{satelliteContext?.ecostress?.status === "available" ? "DATA FOUND" : satelliteContext?.ecostress?.status === "needs_token" ? "TOKEN REQUIRED" : "UNAVAILABLE"}</span></div>
-                        {satelliteContext?.ecostress?.status === "available" ? <>
-                          <div className="ws-earth-highlight"><strong>{Number(satelliteContext.ecostress.latest?.value).toFixed(2)} <small>mm/day</small></strong><span>latest daytime ET estimate · {satelliteContext.ecostress.latest?.date || "—"}</span></div>
-                          <div className="ws-eco-observations">{satelliteContext.ecostress.observations.slice(-5).reverse().map((item) => <div key={item.date}><span>{item.date}</span><strong>{item.value.toFixed(2)} mm/day</strong></div>)}</div>
-                          <small className="vi-method-note">{satelliteContext.ecostress.source} · {satelliteContext.ecostress.resolutionM} m grid · {satelliteContext.ecostress.observations.length} recent sampled observation(s).</small>
-                        </> : <div className="ws-source-unavailable"><p>{satelliteContext?.ecostress?.reason || "ECOSTRESS observations were not available for this location and period."}</p>{satelliteContext?.ecostress?.status === "needs_token" && <a href="https://urs.earthdata.nasa.gov/" target="_blank" rel="noreferrer">NASA Earthdata Login</a>}</div>}
-                        {satelliteContext?.ecostress?.note && <small className="vi-method-note">{satelliteContext.ecostress.note}</small>}
-                      </article>
                     </div>
-                    <div className="ws-earth-footnote"><Icon name="info" size={14}/><span>IMERG is a roughly 10 km rainfall estimate; ECOSTRESS JET is a 70 m daytime ET estimate with irregular ISS sampling. Both are sampled at the field centre, not averaged across the full boundary. ET is not the same as crop water demand, and a high ET value alone does not prove water stress.</span></div>
+                    <div className="ws-earth-footnote"><Icon name="info" size={14}/><span>IMERG is a roughly 10 km rainfall estimate sampled at the field centre, not averaged across the full boundary.</span></div>
                   </section>
 
                   <section className="vi-white-panel"><div className="vi-panel-title"><div><span className="vi-overline">04 / WATER STRESS TIMELINE</span><h2>Month by month</h2><p>The coloured strip rates each month. The line shows root-zone wetness against what is normal for that month at this location.</p></div></div><StressTimeline months={result.monthly}/></section>
@@ -472,7 +463,7 @@ export default function WaterStressIntelligence() {
                   <section className="vi-white-panel vi-observation-table"><div className="vi-panel-title"><div><span className="vi-overline">07 / MONTHLY DETAIL</span><h2>Evidence by month</h2></div><span className="vi-panel-stamp">NASA POWER</span></div><div className="vi-table-scroll"><table><thead><tr><th>Month</th><th>Rating</th><th>Rain</th><th>Normal</th><th>% of normal</th><th>Root wetness</th><th>Normal wetness</th><th>Max temp</th><th>ET0</th><th>Rain − ET0</th><th>3-mo index</th></tr></thead><tbody>{result.monthly.map((m) => <tr key={m.month}><td>{formatMonth(m.month)}{m.partial ? " *" : ""}</td><td><b className="ws-dot" style={{ background: LEVEL_COLORS[m.stressLevel] }}/> {m.stressLabel}</td><td>{mm(m.rainMm)}</td><td>{mm(m.normalRainMm)}</td><td>{pct(m.rainRatio)}</td><td>{wet(m.rootWetness)}</td><td>{wet(m.rootWetnessNormal)}</td><td>{Number.isFinite(m.tmax) ? `${m.tmax.toFixed(1)}°C${Number.isFinite(m.tmaxAnomaly) ? ` (${m.tmaxAnomaly > 0 ? "+" : ""}${m.tmaxAnomaly.toFixed(1)})` : ""}` : "—"}</td><td>{mm(m.et0Mm)}</td><td>{Number.isFinite(m.waterBalanceMm) ? `${Math.round(m.waterBalanceMm)} mm` : "—"}</td><td>{Number.isFinite(m.spi3) ? m.spi3.toFixed(1) : "—"}</td></tr>)}</tbody></table></div><small className="vi-method-note">* Month with fewer days of data (most recent month, or NASA POWER lag). Normals are matched to the observed days.</small></section>
 
                   <section className="vi-caveats"><div><span className="vi-overline">READ THE DATA RESPONSIBLY</span><h3>What this can—and cannot—tell you.</h3></div><ul>{[...result.caveats, result.baseline.note, "How ratings are built: a month gains points for root-zone wetness well below normal, rainfall below 75% (or 50%) of normal or a dry three-month rainfall index (whichever is worse, counted once), very low absolute wetness, and, once, either daytime temperatures 2°C or more above normal or evaporative demand 10% above normal. Zero points is Normal, 1 Watch, 2–3 Moderate, 4 or more Severe."].map((item) => <li key={item}>{item}</li>)}</ul></section>
-                  <div className="vi-source-footer"><span>DATA: NASA POWER (MERRA-2) · GPM IMERG · ECOSTRESS · NASA GIBS imagery</span><span>{result.source.gridNote}</span><a href="https://power.larc.nasa.gov/docs/services/api/" target="_blank" rel="noreferrer">NASA POWER API <Icon name="external" size={12}/></a></div>
+                  <div className="vi-source-footer"><span>DATA: NASA POWER (MERRA-2) · GPM IMERG · NASA GIBS imagery</span><span>{result.source.gridNote}</span><a href="https://power.larc.nasa.gov/docs/services/api/" target="_blank" rel="noreferrer">NASA POWER API <Icon name="external" size={12}/></a></div>
                 </>
               )}
             </section>

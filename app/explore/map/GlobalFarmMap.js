@@ -821,7 +821,7 @@ export default function GlobalFarmMap() {
           <div ref={mapContainerRef} className="agm-map-canvas" />
           {!mapReady && <div className="agm-map-loading"><span className="agm-map-spinner"/><strong>Preparing the global map</strong><small>Loading map tiles and field drawing tools</small></div>}
           {mapError && <div className="agm-map-error"><Icon name="info" size={18}/><span>{mapError}</span></div>}
-          <div className="agm-map-toolbar"><div className="agm-map-toolbar-label"><span className="agm-live-dot"/> GLOBAL FIELD WORKSPACE</div><span>WGS 84 · GeoJSON boundaries</span></div>
+          <div className="agm-map-toolbar"><div className="agm-map-toolbar-label"><span className="agm-live-dot"/> GLOBAL FIELD WORKSPACE (Zoom in the map to select fields)</div><span>WGS 84 · GeoJSON boundaries</span></div>
           <div className="agm-map-bottom-left"><span className="agm-map-scale-note">Use the map to zoom to field level</span></div>
           <div className="agm-map-attribution-note">Street map © OpenStreetMap contributors · Satellite tiles © Esri · Field boundaries © Fields of the World (CC BY 4.0) · NASA overlay © NASA GIBS</div>
         </section>

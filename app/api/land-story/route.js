@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 const OPTIONAL_SOURCE_TIMEOUT_MS = 8_000;
 const GEMINI_TIMEOUT_MS = 40_000;
-const DEFAULT_MODEL = "gemini-3.8-flash";
+const DEFAULT_MODEL = "gemini-3.6-flash";
 const MAX_PROMPT_EVIDENCE_CHARS = 18_000;
 
 const STORY_SCHEMA = {

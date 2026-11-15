@@ -1,0 +1,13 @@
+/* Water-stress page extras. Layout classes come from ../vegetation/vegetation.css (vi-*). */
+.ws-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.ws-map-controls { flex-wrap: wrap; gap: 6px; }
+.ws-map-controls select, .ws-map-controls input[type="date"] { min-height: 28px; padding: 0 8px; border: 1px solid #d8e2d1; border-radius: 5px; color: #3f5238; background: #fff; font: inherit; font-size: 11px; }
+.ws-layer-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; font-size: 11px; line-height: 1.5; color: #6f7a66; border-top: 1px solid rgba(146,116,81,.14); }
+.ws-layer-note svg { flex: none; margin-top: 2px; }
+.ws-status.ws-level-2 { border-color: #e9c9a3; }
+.ws-status.ws-level-3 { border-color: #e2b0a8; }
+.ws-status .vi-story-leaf { color: #fff; }
+.ws-period-list { margin: 12px 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.ws-period-list li { padding: 10px 12px; border: 1px solid #ece3cf; border-radius: 9px; background: #fbf7ea; }
+.ws-period-list strong { display: block; font-size: 12px; color: #3f5238; }
+.ws-period-list span { display: block; margin-top: 2px; font-size: 11px; color: #6f7a66; line-height: 1.5; }

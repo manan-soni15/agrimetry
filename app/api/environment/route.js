@@ -74,6 +74,7 @@ export async function GET(request) {
   const longitude = Number(searchParams.get("lon"));
 
   if (
+    !(searchParams.get("lat") || "").trim() || !(searchParams.get("lon") || "").trim() ||
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
     latitude < -90 || latitude > 90 ||

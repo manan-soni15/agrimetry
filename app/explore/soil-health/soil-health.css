@@ -1,0 +1,23 @@
+/* Soil health page extras. Layout classes come from the vegetation / water-stress / bare-field stylesheets. */
+.sh-form-help { margin: 4px 0 10px; font-size: 11px; line-height: 1.5; color: #6f7a66; }
+.sh-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.sh-form label { display: grid; gap: 3px; font-size: 10px; font-weight: 700; color: #4d5c45; }
+.sh-form input { min-height: 32px; padding: 0 8px; border: 1px solid #d8e2d1; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; color: #2f4d33; }
+.sh-form-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.sh-link-button { border: 0; background: none; color: #8a6a63; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.sh-notice { margin-bottom: 4px; }
+.sh-metric-text { font-size: 18px; }
+.sh-limits { display: grid; gap: 10px; margin-top: 10px; }
+.sh-limit { padding: 12px 14px; border: 1px solid #ece3cf; border-left: 4px solid #6e925f; border-radius: 10px; background: #fbf7ea; }
+.sh-limit-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sh-limit-head strong { font-size: 13px; color: #3f5238; }
+.sh-evidence { display: block; margin: 3px 0 6px; color: #8a927f; font-size: 10px; }
+.sh-limit p { margin: 4px 0; font-size: 12px; line-height: 1.55; color: #46553f; }
+.sh-texture { display: grid; gap: 8px; margin-top: 10px; }
+.sh-texture-row { display: grid; grid-template-columns: 74px 1fr 96px; align-items: center; gap: 10px; font-size: 11px; color: #6f7a66; }
+.sh-texture-bar { display: flex; height: 18px; overflow: hidden; border-radius: 5px; background: #eee7d6; }
+.sh-texture-bar i { display: block; height: 100%; }
+.sh-texture-bar em { padding-left: 8px; font-size: 10px; line-height: 18px; }
+.sh-texture-row small { text-align: right; font-size: 10px; }
+.sh-meta-list { margin: 10px 0; padding-left: 16px; display: grid; gap: 6px; font-size: 12px; line-height: 1.5; color: #46553f; }
+.vi-table-scroll td small { color: #8a927f; }

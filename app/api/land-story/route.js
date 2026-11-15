@@ -193,7 +193,7 @@ function serializePromptEvidence(items) {
 
 function getGeminiError(error) {
   if (error?.name === "TimeoutError" || error?.name === "AbortError") {
-    return "Gemini took too long to finish this story. Your completed field analysis is still saved. Please try again.";
+    return "We took too long to finish this story. Your completed field analysis is still saved. Please try again.";
   }
   return String(error?.message || "Could not generate the land story. Please try again.").slice(0, 400);
 }
@@ -226,7 +226,7 @@ async function callGemini({ apiKey, model, contents, generationConfig, systemIns
     ?.map((part) => part.text || "")
     .join("")
     .trim();
-  if (!generatedText) throw new Error("Gemini returned an empty response. Please try again.");
+  if (!generatedText) throw new Error("We returned an empty response. Please try again.");
   return generatedText;
 }
 
@@ -240,7 +240,7 @@ export async function POST(request) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "Gemini is not configured. Add GEMINI_API_KEY to .env.local and restart the server." }, { status: 503 });
+    return NextResponse.json({ error: " is not configured. Add GEMINI_API_KEY to .env.local and restart the server." }, { status: 503 });
   }
 
   let geometry;

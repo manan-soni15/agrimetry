@@ -1,0 +1,42 @@
+/* Rotation page extras. Layout classes come from the other explore stylesheets. */
+.ro-slots { display: grid; gap: 6px; }
+.ro-slots label { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; color: #4d5c45; }
+.ro-slots select, .ro-select { min-height: 30px; padding: 0 6px; border: 1px solid #d8e2d1; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; color: #2f4d33; }
+.ro-sliders { display: grid; gap: 10px; }
+.ro-slider-row { display: grid; gap: 2px; font-size: 11px; font-weight: 700; color: #4d5c45; }
+.ro-slider-row div { display: flex; justify-content: space-between; }
+.ro-slider-row small { font-weight: 500; color: #8a927f; font-size: 10px; }
+.ro-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ro-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid #d8e2d1; border-radius: 99px; background: #f4f8ef; font-size: 10px; font-weight: 700; color: #4d5c45; cursor: pointer; user-select: none; }
+.ro-chip.on { background: #426b46; border-color: #426b46; color: #fff; }
+.ro-chip input { display: none; }
+.ro-equip { display: grid; gap: 5px; margin-top: 6px; font-size: 11px; color: #4d5c45; }
+.ro-equip label { display: flex; gap: 7px; align-items: center; font-weight: 600; }
+.ro-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 10px; }
+.ro-card { position: relative; padding: 12px 14px; border: 2px solid #e6dece; border-radius: 12px; background: #fbf9f3; text-align: left; font: inherit; cursor: pointer; }
+.ro-card.active { border-color: #426b46; background: #f1f6ec; }
+.ro-card-label { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: #8a927f; text-transform: uppercase; }
+.ro-card-score { display: block; margin: 4px 0; font-size: 28px; font-weight: 800; color: #2f4d33; }
+.ro-card-score small { font-size: 11px; font-weight: 600; color: #8a927f; }
+.ro-card-seq { font-size: 12px; line-height: 1.5; color: #46553f; }
+.ro-badge { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 99px; font-size: 9px; font-weight: 800; color: #fff; background: #6e925f; }
+.ro-badge.current { background: #8a6a63; }
+.ro-bars { display: grid; gap: 6px; margin-top: 10px; }
+.ro-bar-row { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: center; font-size: 11px; color: #4d5c45; }
+.ro-bar-set { display: grid; gap: 2px; }
+.ro-bar { display: grid; grid-template-columns: 1fr 30px; align-items: center; gap: 6px; }
+.ro-bar span { display: block; height: 8px; border-radius: 4px; }
+.ro-bar em { font-style: normal; font-size: 10px; color: #6f7a66; }
+.ro-bar-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 10px; color: #6f7a66; }
+.ro-explain { display: grid; gap: 8px; margin-top: 10px; }
+.ro-explain-row { padding: 9px 12px; border: 1px solid #ece3cf; border-radius: 9px; background: #fbf7ea; font-size: 12px; line-height: 1.5; color: #46553f; }
+.ro-explain-row b { color: #3f5238; }
+.ro-explain-row small { color: #8a927f; }
+.ro-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.ro-list h3 { margin: 0 0 6px; font-size: 12px; }
+.ro-list ul { margin: 0; padding-left: 16px; display: grid; gap: 5px; font-size: 12px; line-height: 1.5; color: #46553f; }
+.ro-list.benefits h3 { color: #2f6b3a; }
+.ro-list.risks h3 { color: #a63a2b; }
+.ro-list.missing h3 { color: #7a6a2f; }
+.ro-weights { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ro-weights span { padding: 2px 8px; border-radius: 99px; background: #eef2e8; font-size: 10px; color: #4d5c45; }

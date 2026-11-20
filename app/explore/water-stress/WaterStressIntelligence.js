@@ -357,7 +357,7 @@ export default function WaterStressIntelligence() {
             <h1>See when your field was <em>thirsty</em>.</h1>
             <p>Agrimetry compares your field&apos;s recent rainfall, soil wetness and temperature with the same months over the past two decades, flags periods of declining soil moisture and builds a month-by-month water-stress timeline. GPM IMERG rainfall totals add independent satellite context alongside the established climate analysis.</p>
           </div>
-          <div className="vi-intro-note"><Icon name="drop" size={20}/><span>NASA POWER baseline · GPM IMERG<br/><strong>NASA Earthdata token enables extra satellite series</strong></span></div>
+          <div className="vi-intro-note"><Icon name="drop" size={20}/><span>NASA POWER baseline · GPM IMERG<br/><strong>NASA Earthdata enables extra satellite series</strong></span></div>
         </section>
 
         {fields.length === 0 ? (
